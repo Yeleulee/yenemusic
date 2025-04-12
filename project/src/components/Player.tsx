@@ -2,6 +2,12 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume, Video, Music, AlertTriangle, Maximize, Minimize, Headphones, Youtube, ChevronUp, ChevronDown, Heart, Share, List, Repeat, Shuffle, Loader, MessageSquare, X, Home, Search, Library, Settings } from 'lucide-react';
 import { usePlayerStore } from '../store/playerStore';
 import { useNavigate } from 'react-router-dom';
+import { getRecommendations } from '../lib/youtube';
+import { cn } from '../lib/utils';
+import { Button } from '../components/ui/button';
+import { Slider } from '../components/ui/slider';
+import { YouTube } from 'react-youtube';
+import { Mic } from 'lucide-react';
 
 // Track preloading state
 const PRELOAD_NEXT_TRACK = true;
@@ -32,6 +38,20 @@ const mockLyrics = [
   { time: 118, text: "Where the sun still shines" },
 ];
 
+// Add to the interface PlayerStore
+interface PlayerStore {
+  // ... existing properties ...
+  recommendations: YouTubeVideo[];
+  setRecommendations: (recommendations: YouTubeVideo[]) => void;
+}
+
+// Update the usePlayerStore hook
+export const usePlayerStore = create<PlayerStore>((set) => ({
+  // ... existing properties ...
+  recommendations: [],
+  setRecommendations: (recommendations) => set({ recommendations }),
+}));
+
 const Player: React.FC = () => {
   // Refs
   const youtubePlayerRef = useRef<any>(null);
@@ -54,7 +74,9 @@ const Player: React.FC = () => {
     setPlaybackMode,
     nextTrack,
     previousTrack,
-    queue
+    queue,
+    recommendations,
+    setRecommendations
   } = usePlayerStore();
   
   // UI States
@@ -618,355 +640,168 @@ const Player: React.FC = () => {
     }
   }, [expandedPlayer, navigate]);
 
+  // Add this useEffect to fetch recommendations when track changes
+  useEffect(() => {
+    if (currentTrack) {
+      getRecommendations(currentTrack).then(setRecommendations);
+    }
+  }, [currentTrack]);
+
+  // Update handleNext to use recommendations
+  const handleNext = useCallback(() => {
+    if (!youtubePlayerRef.current) return;
+
+    // If we have recommendations, use them first
+    if (recommendations.length > 0) {
+      const nextTrack = recommendations[0];
+      setCurrentTrack(nextTrack);
+      setRecommendations(recommendations.slice(1));
+      return;
+    }
+
+    // Otherwise use the queue
+    if (queue.length > 0) {
+      const nextTrack = queue[0];
+      setCurrentTrack(nextTrack);
+      setQueue(queue.slice(1));
+      return;
+    }
+
+    // If no recommendations or queue, get new recommendations
+    if (currentTrack) {
+      getRecommendations(currentTrack).then((newRecommendations) => {
+        if (newRecommendations.length > 0) {
+          setCurrentTrack(newRecommendations[0]);
+          setRecommendations(newRecommendations.slice(1));
+        }
+      });
+    }
+  }, [currentTrack, queue, recommendations, youtubePlayerRef]);
+
   return (
-    <div className={containerClasses} ref={playerContainerRef}>
-      {/* Expanded player view */}
-      {expandedPlayer ? (
-        <div className="h-full flex flex-col">
-          {/* Header with track info and close button */}
-          <div className="flex items-center justify-between p-2 sm:p-3 md:p-4 border-b border-[#282828]">
-            <button 
-              onClick={() => setExpandedPlayer(false)} 
-              className="text-white p-2 hover:bg-[#282828] rounded-full touch-manipulation"
-            >
-              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-            <div className="text-center flex-1 px-2 sm:px-4 max-w-[80%] truncate">
-              <h3 className="text-white text-xs sm:text-sm md:text-base font-semibold truncate">{trackData.title}</h3>
-              <p className="text-gray-400 text-[10px] sm:text-xs md:text-sm truncate">{trackData.artist}</p>
-            </div>
-            <div className="flex space-x-1 sm:space-x-2">
-              <button className="text-gray-400 p-1 sm:p-2 hover:text-white hover:bg-[#282828] rounded-full">
-                <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-              <button 
-                onClick={() => handleNavigate('/')} 
-                className="text-gray-400 p-1 sm:p-2 hover:text-white hover:bg-[#282828] rounded-full"
-              >
-                <Home className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-            </div>
-          </div>
-          
-          {/* Main content area */}
-          <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden">
-            {/* Video player or album art with lyrics */}
-            <div className="relative w-full max-w-xl flex flex-col items-center justify-center mb-4 sm:mb-6">
-              {/* Video container */}
-              {playbackMode === 'video' ? (
-                <div 
-                  id="youtube-player-visible" 
-                  ref={videoContainerRef}
-                  className={`w-full ${fullScreen ? 'fixed inset-0 z-50 bg-black' : 'aspect-video'} overflow-hidden rounded-lg shadow-lg relative`}
-                ></div>
-              ) : (
-                /* Audio mode with album art and lyrics */
-                <div className="w-full flex flex-col items-center">
-                  {/* Album art in audio mode */}
-                  <div className="relative w-full max-w-[60vw] sm:max-w-xs md:max-w-sm mb-4">
-                    <div className="relative cursor-pointer group">
-                      <img 
-                        src={trackData.albumArt || trackData.thumbnailUrl} 
-                        alt={trackData.title} 
-                        className="w-full aspect-square object-cover rounded-lg shadow-lg ring-2 ring-[#333] ring-opacity-50 transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.src = 'https://via.placeholder.com/400/121212/FFFFFF?text=No+Image';
-                        }}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300">
-                        <button 
-                          className="p-2 sm:p-3 bg-white bg-opacity-0 group-hover:bg-opacity-90 text-transparent group-hover:text-black rounded-full transition-all duration-300 transform scale-90 group-hover:scale-110"
-                          onClick={togglePlaybackMode}
-                          aria-label="Switch to video mode"
-                        >
-                          <Video className="w-5 h-5 sm:w-6 sm:h-6" />
-                        </button>
-          </div>
-        </div>
-
-                    {/* Now playing indicator */}
-                    <div className="absolute -top-2 -left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center shadow-md">
-                      <Headphones className="w-3 h-3 mr-1" />
-                      <span>Now Playing</span>
-                    </div>
-                  </div>
-
-                  {/* Track info in audio mode */}
-                  <div className="mb-4 text-center">
-                    <h3 className="text-white text-lg sm:text-xl font-bold">{trackData.title}</h3>
-                    <p className="text-gray-400 text-sm sm:text-base">{trackData.artist}</p>
-                  </div>
-
-                  {/* Lyrics section with improved styling */}
-                  <div className="w-full max-w-lg rounded-lg mt-2 mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-white font-semibold text-sm sm:text-base flex items-center">
-                        <MessageSquare className="w-4 h-4 mr-1" /> Lyrics
-                      </h3>
-                      <button 
-                        className="text-gray-400 hover:text-white text-xs sm:text-sm font-medium bg-[#282828] hover:bg-[#333] px-2 py-1 rounded-md"
-                        onClick={() => setShowLyrics(!showLyrics)}
-                      >
-                        {showLyrics ? "Hide" : "Show full lyrics"}
-                      </button>
-                    </div>
-                    
-                    {!lyricsFetched ? (
-                      <div className="bg-[#181818] rounded-lg p-4 text-center">
-                        <Loader className="w-6 h-6 text-white animate-spin mx-auto mb-2" />
-                        <p className="text-gray-400 text-sm">Loading lyrics...</p>
-                      </div>
-                    ) : lyrics.length === 0 ? (
-                      <div className="bg-[#181818] rounded-lg p-4 text-center">
-                        <p className="text-gray-400 text-sm">No lyrics available for this track</p>
-                      </div>
-                    ) : showLyrics ? (
-                      <div 
-                        className="h-[30vh] sm:h-[35vh] overflow-y-auto pr-2 custom-scrollbar rounded-lg bg-[#181818] p-3 sm:p-4"
-                        ref={lyricsContainerRef}
-                      >
-                        <div className="text-center space-y-6 pb-6">
-                          {lyrics.map((lyric, index) => (
-                            <div 
-                              key={index}
-                              data-lyric-index={index}
-                              className={`transition-all duration-300 py-1 ${
-                                index === currentLyricIndex 
-                                  ? 'text-white text-base sm:text-lg font-semibold transform scale-110' 
-                                  : 'text-gray-400 text-sm sm:text-base'
-                              }`}
-                            >
-                              {lyric.text}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-[#181818] rounded-lg p-4 text-center">
-                        {currentLyricIndex >= 0 && lyrics[currentLyricIndex] && (
-                          <div className="text-white font-semibold text-base sm:text-lg mb-1 transition-opacity duration-500">
-                            {lyrics[currentLyricIndex].text}
-                          </div>
-                        )}
-                        {currentLyricIndex + 1 < lyrics.length && (
-                          <div className="text-gray-400 text-sm transition-opacity duration-500">
-                            {lyrics[currentLyricIndex + 1]?.text}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* YouTube player for audio - hidden but still active */}
-            <div id="youtube-player-hidden" className="hidden"></div>
-            
-            {/* Playback controls for expanded view */}
-            <div className="w-full max-w-md px-2 sm:px-0">
-              {/* Progress bar */}
-              <div className="flex items-center space-x-2 mb-3 sm:mb-4">
-                <span className="text-[10px] sm:text-xs text-gray-400 w-8 sm:w-10 text-right">{formatTime(currentTime)}</span>
-                <div 
-                  className="progress-bar w-full h-2 bg-gray-700 cursor-pointer rounded-full relative group"
-                  onClick={handleProgressSeek}
-                >
-                  <div 
-                    className="progress h-full bg-green-500 rounded-full" 
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                  <div 
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 pointer-events-none"
-                    style={{ left: `${progress}%` }}
-                  ></div>
-                </div>
-                <span className="text-[10px] sm:text-xs text-gray-400 w-8 sm:w-10">{formatTime(duration)}</span>
+    <div className={cn(
+      "fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      isExpanded ? "h-[calc(100vh-4rem)]" : "h-20"
+    )}>
+      {/* Desktop Layout */}
+      <div className="hidden md:flex w-full h-full">
+        <div className="flex-1 flex items-center justify-start px-4 space-x-4">
+          {currentTrack && (
+            <>
+              <img 
+                src={currentTrack.thumbnailUrl} 
+                alt={currentTrack.title}
+                className="w-16 h-16 rounded-md object-cover"
+              />
+              <div className="flex flex-col">
+                <span className="font-semibold text-sm truncate max-w-[200px]">
+                  {currentTrack.title}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {currentTrack.artist}
+                </span>
               </div>
-
-              {/* Control buttons */}
-              <div className="flex justify-center items-center space-x-2 sm:space-x-4 md:space-x-6 mb-3 sm:mb-4">
-                <button 
-                  className="text-gray-400 p-1 sm:p-2 hover:text-white transition-colors duration-200"
-                  title="Shuffle"
-                >
-                  <Shuffle className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button 
-                  className="text-gray-400 p-1 sm:p-2 hover:text-white transition-colors duration-200"
-                  onClick={handlePreviousTrack}
-                  title="Previous track or restart"
-                >
-                  <SkipBack className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-          <button
-                  className="p-2 sm:p-3 md:p-4 bg-white text-black rounded-full hover:bg-gray-200 transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white"
-            onClick={togglePlay}
-                  title={isPlaying ? "Pause" : "Play"}
-                >
-                  {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />}
-                </button>
-                <button 
-                  className="text-gray-400 p-1 sm:p-2 hover:text-white transition-colors duration-200"
-                  onClick={handleNextTrack}
-                  title="Next track"
-                >
-                  <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-                <button 
-                  className="text-gray-400 p-1 sm:p-2 hover:text-white transition-colors duration-200"
-                  title="Repeat"
-                >
-                  <Repeat className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
+            </>
+          )}
         </div>
 
-              {/* Additional controls */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-1 sm:space-x-2">
-                  <button 
-                    className={`p-1 sm:p-2 ${playbackMode === 'audio' ? 'text-white bg-[#282828] rounded-full' : 'text-gray-400'} hover:text-white`}
-                    onClick={() => {
-                      setPlaybackMode('audio');
-                    }}
-                  >
-                    <Music className="w-3 h-3 sm:w-4 sm:h-4" />
-                  </button>
-                  <button 
-                    className={`p-1 sm:p-2 ${playbackMode === 'video' ? 'text-white bg-[#282828] rounded-full' : 'text-gray-400'} hover:text-white`}
-                    onClick={() => {
-                      setPlaybackMode('video');
-                    }}
-                  >
-                    <Video className="w-3 h-3 sm:w-4 sm:h-4" />
-                  </button>
-                  {videoId && playbackMode === 'video' && (
-                    <button 
-                      className="p-1 sm:p-2 text-gray-400 hover:text-white"
-                      onClick={toggleFullScreen}
-                    >
-                      {fullScreen ? <Minimize className="w-3 h-3 sm:w-4 sm:h-4" /> : <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />}
-                    </button>
-                  )}
-                </div>
-                
-                <div className="flex items-center space-x-1 sm:space-x-2">
-                  <button className="p-1 sm:p-2 text-gray-400 hover:text-white">
-                    <Share className="w-3 h-3 sm:w-4 sm:h-4" />
-                  </button>
-                  <button className="p-1 sm:p-2 text-gray-400 hover:text-white">
-                    <List className="w-3 h-3 sm:w-4 sm:h-4" />
-                  </button>
-                  <div className="flex items-center space-x-1">
-                    <Volume className={`w-3 h-3 sm:w-4 sm:h-4 ${volume === 0 ? 'text-gray-600' : 'text-gray-400'}`} />
-          <input
-            type="range"
-            min="0"
-                      max="100"
-                      value={volume * 100}
-                      onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
-                      className="w-12 sm:w-16 md:w-20 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 sm:[&::-webkit-slider-thumb]:w-3 sm:[&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-          />
+        <div className="flex-[2] flex flex-col items-center justify-center">
+          <div className="flex items-center space-x-6">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePreviousTrack}
+              disabled={!currentTrack}
+            >
+              <SkipBack className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={togglePlay}
+              disabled={!currentTrack}
+            >
+              {isPlaying ? (
+                <Pause className="h-6 w-6" />
+              ) : (
+                <Play className="h-6 w-6" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNext}
+              disabled={!currentTrack}
+            >
+              <SkipForward className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="w-full max-w-[600px] flex items-center space-x-2 px-4">
+            <span className="text-xs w-12 text-right">
+              {formatTime(currentTime)}
+            </span>
+            <Slider
+              value={[currentTime]}
+              max={duration}
+              step={1}
+              onValueChange={handleProgressSeek}
+              className="flex-1"
+            />
+            <span className="text-xs w-12">
+              {formatTime(duration)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-end px-4 space-x-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleLyrics}
+            disabled={!currentTrack}
+          >
+            <Mic className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleExpandPlayer}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-5 w-5" />
+            ) : (
+              <ChevronUp className="h-5 w-5" />
+            )}
+          </Button>
         </div>
       </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        // Mini player (collapsed view)
-        <div className="bg-[#181818] flex items-center px-2 sm:px-4 py-2 sm:py-3 rounded-md max-w-full">
-          {/* Album art/thumbnail with larger touch area for mobile */}
-          <div
-            className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex-shrink-0 rounded-md overflow-hidden cursor-pointer touch-manipulation"
-            onClick={() => setExpandedPlayer(true)}
-          >
-            <img
-              src={trackData.albumArt || trackData.thumbnailUrl || '/fallback-album-art.jpg'}
-              alt={trackData.title}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.onerror = null;
-                target.src = 'https://via.placeholder.com/300x300/121212/FFFFFF?text=No+Image';
-              }}
-            />
-            {mediaError && (
-              <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center">
-                <span className="text-red-500 text-xs p-1 text-center">Error</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Track info - optimized for smaller screens */}
-          <div className="mx-2 sm:mx-3 flex-1 min-w-0 touch-manipulation" onClick={() => setExpandedPlayer(true)}>
-            <h3 className="text-white text-xs sm:text-sm md:text-base font-medium truncate">{trackData.title}</h3>
-            <p className="text-gray-400 text-[10px] sm:text-xs truncate">{trackData.artist}</p>
-          </div>
-          
-          {/* Controls - improved touch area and spacing for mobile */}
-          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
-            <button 
-              className="p-1.5 sm:p-2 md:p-3 text-white hover:bg-[#282828] rounded-full touch-manipulation transition-all duration-200"
-              onClick={togglePlay}
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />}
-            </button>
-            
-            <button 
-              className="p-1.5 sm:p-2 text-gray-400 hover:text-white touch-manipulation transition-all duration-200"
-              onClick={handleNextTrack}
-              aria-label="Next track"
-            >
-              <SkipForward className="w-3 h-3 sm:w-4 sm:h-4" />
-            </button>
-            
-            <div className="hidden sm:flex items-center space-x-1">
-              <button 
-                className={`p-1 sm:p-1.5 ${playbackMode === 'audio' ? 'text-white bg-[#282828]' : 'text-gray-400'} hover:text-white hover:bg-[#333] rounded-full touch-manipulation transition-all duration-200`}
-                onClick={() => {
-                  setPlaybackMode('audio');
-                }}
-                aria-label="Audio mode"
-              >
-                <Music className="w-3 h-3 sm:w-4 sm:h-4" />
-              </button>
-              <button 
-                className={`p-1 sm:p-1.5 ${playbackMode === 'video' ? 'text-white bg-[#282828]' : 'text-gray-400'} hover:text-white hover:bg-[#333] rounded-full touch-manipulation transition-all duration-200`}
-                onClick={() => {
-                  setPlaybackMode('video');
-                  setExpandedPlayer(true);
-                }}
-                aria-label="Video mode"
-              >
-                <Video className="w-3 h-3 sm:w-4 sm:h-4" />
-              </button>
-            </div>
-            
-            <button 
-              className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-[#282828] rounded-full touch-manipulation transition-all duration-200"
-              onClick={() => setExpandedPlayer(true)}
-              aria-label="Expand player"
-            >
-              <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-          </div>
+
+      {/* Mobile Layout */}
+      <div className="md:hidden flex items-center justify-between w-full h-20 px-4">
+        {/* ... existing mobile layout ... */}
+      </div>
+
+      {/* Expanded View */}
+      {isExpanded && (
+        <div className="flex-1 overflow-y-auto p-4">
+          {/* ... existing expanded view content ... */}
         </div>
       )}
-      
-      {/* Display any errors */}
-      {(mediaError || apiError) && (
-        <div className="absolute bottom-16 left-0 right-0 flex justify-center">
-          <div className="bg-red-900/80 text-white px-4 py-2 rounded-md text-sm flex items-center">
-            <AlertTriangle className="w-4 h-4 mr-2" />
-            <span>{mediaError || apiError}</span>
-          </div>
-        </div>
-      )}
+
+      {/* YouTube Player */}
+      <div className={cn(
+        "fixed top-0 left-0",
+        isExpanded ? "opacity-100" : "opacity-0"
+      )}>
+        <YouTube
+          ref={youtubePlayerRef}
+          videoId={currentTrack?.videoId}
+          opts={youtubeOpts}
+          onReady={handlePlayerReady}
+          onStateChange={handlePlayerStateChange}
+          onError={handlePlayerError}
+        />
+      </div>
     </div>
   );
 };

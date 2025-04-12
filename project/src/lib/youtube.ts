@@ -352,3 +352,84 @@ export const getGenreMusic = async (genre: string, maxResults: number = 8): Prom
     throw error;
   }
 };
+
+// Genre definitions with associated artists and keywords
+const genreDefinitions = {
+  rap: {
+    artists: ['Drake', 'Kendrick Lamar', 'Eminem', 'Jay-Z', 'Travis Scott', 'Kanye West', 'J. Cole', 'Lil Wayne', 'Nicki Minaj', 'Cardi B', 'Megan Thee Stallion', 'Post Malone', 'Tyler, The Creator', 'Snoop Dogg', 'Dr. Dre', 'Tupac', '2Pac', 'Notorious B.I.G.', 'Ice Cube'],
+    keywords: ['rap', 'hip hop', 'trap', 'drill', 'freestyle']
+  },
+  pop: {
+    artists: ['Taylor Swift', 'Ariana Grande', 'Justin Bieber', 'Ed Sheeran', 'Bruno Mars', 'Billie Eilish', 'Lady Gaga', 'Dua Lipa', 'Harry Styles', 'Olivia Rodrigo', 'The Weeknd', 'Doja Cat', 'BTS'],
+    keywords: ['pop', 'dance pop', 'synth pop', 'electropop']
+  },
+  rock: {
+    artists: ['Metallica', 'Nirvana', 'Led Zeppelin', 'Pink Floyd', 'Queen', 'AC/DC', 'Red Hot Chili Peppers', 'Foo Fighters', 'Green Day', 'Linkin Park'],
+    keywords: ['rock', 'metal', 'alternative', 'grunge', 'punk']
+  },
+  rnb: {
+    artists: ['Beyoncé', 'Rihanna', 'The Weeknd', 'SZA', 'Frank Ocean', 'Usher', 'John Legend', 'Alicia Keys', 'Chris Brown'],
+    keywords: ['r&b', 'rnb', 'soul', 'contemporary r&b']
+  }
+};
+
+// Function to detect genre of a track
+export const detectGenre = (title: string, artist: string): string => {
+  const lowerTitle = title.toLowerCase();
+  const lowerArtist = artist.toLowerCase();
+  
+  for (const [genre, definition] of Object.entries(genreDefinitions)) {
+    // Check if artist is in genre's artist list
+    if (definition.artists.some(genreArtist => 
+      lowerArtist.includes(genreArtist.toLowerCase()) ||
+      genreArtist.toLowerCase().includes(lowerArtist)
+    )) {
+      return genre;
+    }
+    
+    // Check if title contains genre keywords
+    if (definition.keywords.some(keyword => lowerTitle.includes(keyword))) {
+      return genre;
+    }
+  }
+  
+  return 'other';
+};
+
+// Function to get similar artists based on genre
+export const getSimilarArtists = (genre: string): string[] => {
+  return genreDefinitions[genre as keyof typeof genreDefinitions]?.artists || [];
+};
+
+// Function to get recommendations based on current track
+export const getRecommendations = async (currentTrack: YouTubeVideo): Promise<YouTubeVideo[]> => {
+  try {
+    const genre = detectGenre(currentTrack.title, currentTrack.artist);
+    const similarArtists = getSimilarArtists(genre);
+    
+    // Get 2-3 random artists from the same genre
+    const randomArtists = similarArtists
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+      .filter(artist => !currentTrack.artist.toLowerCase().includes(artist.toLowerCase()));
+    
+    // Search for songs from these artists
+    const recommendations: YouTubeVideo[] = [];
+    
+    for (const artist of randomArtists) {
+      const results = await searchMusic(`${artist} official music video`);
+      if (results.length > 0) {
+        // Get 1-2 random songs from each artist
+        const randomSongs = results
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 2);
+        recommendations.push(...randomSongs);
+      }
+    }
+    
+    return recommendations;
+  } catch (error) {
+    console.error('Error getting recommendations:', error);
+    return [];
+  }
+};
