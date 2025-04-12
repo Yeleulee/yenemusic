@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume, Video, Music, AlertTriangle, Maximize, Minimize, Headphones, Youtube, ChevronUp, ChevronDown, Heart, Share, List, Repeat, Shuffle, Loader, MessageSquare, X, Home, Search, Library, Settings } from 'lucide-react';
 import { usePlayerStore } from '../store/playerStore';
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 
 // Track preloading state
 const PRELOAD_NEXT_TRACK = true;
@@ -80,8 +80,8 @@ const Player: React.FC = () => {
   const [isPreloadingNext, setIsPreloadingNext] = useState(false);
   const [recommendedTracks, setRecommendedTracks] = useState<any[]>([]);
 
-  // Add router for navigation
-  const router = useRouter();
+  // Replace router with navigate
+  const navigate = useNavigate();
 
   // Load YouTube API
   useEffect(() => {
@@ -604,19 +604,19 @@ const Player: React.FC = () => {
     }
   }, [nextTrack, queue, nextTrackId, recommendedTracks]);
 
-  // Add navigation handler
+  // Update the navigation handler
   const handleNavigate = useCallback((path: string) => {
     if (expandedPlayer) {
       // Minimize player before navigation for better user experience
       setExpandedPlayer(false);
       // Small delay to allow animation to complete
       setTimeout(() => {
-        router.push(path);
+        navigate(path);
       }, 100);
     } else {
-      router.push(path);
+      navigate(path);
     }
-  }, [expandedPlayer, router]);
+  }, [expandedPlayer, navigate]);
 
   return (
     <div className={containerClasses} ref={playerContainerRef}>
