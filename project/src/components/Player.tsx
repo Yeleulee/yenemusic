@@ -451,7 +451,11 @@ const Player: React.FC = () => {
 
   const toggleExpandPlayer = useCallback(() => {
     setExpandedPlayer(!expandedPlayer);
-  }, [expandedPlayer]);
+    // If we're in video mode and minimizing, switch to audio mode
+    if (expandedPlayer && playbackMode === 'video') {
+      setPlaybackMode('audio');
+    }
+  }, [expandedPlayer, playbackMode]);
 
   const toggleLyrics = useCallback(() => {
     setShowLyrics(!showLyrics);
@@ -833,12 +837,9 @@ const Player: React.FC = () => {
             variant="ghost"
             size="icon"
             className="absolute top-4 right-4 z-50"
-            onClick={() => {
-              setExpandedPlayer(false);
-              setPlaybackMode('audio');
-            }}
+            onClick={() => setExpandedPlayer(false)}
           >
-            <X className="h-6 w-6 text-white" />
+            <ChevronDown className="h-6 w-6 text-white" />
           </Button>
           <div id="youtube-player-visible" className="w-full h-full" />
         </div>
