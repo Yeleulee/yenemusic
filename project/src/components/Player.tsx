@@ -142,6 +142,24 @@ const fadeVariants = {
   visible: { opacity: 1, transition: { duration: 0.2 } }
 };
 
+// Add new styles at the top of the file
+const styles = {
+  container: "fixed bottom-0 left-0 right-0 z-50 bg-[#121212] border-t border-[#282828]",
+  playerWrapper: "flex flex-col h-full",
+  mainContent: "flex items-center justify-between px-6 py-4",
+  albumArt: "w-14 h-14 rounded-lg overflow-hidden cursor-pointer",
+  trackInfo: "flex flex-col ml-4",
+  trackTitle: "text-white font-medium text-sm hover:underline cursor-pointer",
+  artistName: "text-[#b3b3b3] text-xs hover:text-white hover:underline cursor-pointer",
+  controls: "flex items-center justify-center gap-8",
+  controlButton: "text-[#b3b3b3] hover:text-white transition-colors",
+  playButton: "w-8 h-8 flex items-center justify-center bg-white rounded-full hover:scale-110 transition-transform",
+  progressBar: "h-1 bg-[#4d4d4d] rounded-full relative group cursor-pointer",
+  progressFill: "absolute h-full bg-[#1ed760] rounded-full",
+  progressHandle: "absolute h-3 w-3 bg-white rounded-full -top-1 opacity-0 group-hover:opacity-100",
+  volumeSlider: "h-24 flex items-center justify-center",
+};
+
 const Player: React.FC = () => {
   // Refs
   const youtubePlayerRef = useRef<any>(null);
@@ -962,238 +980,200 @@ const Player: React.FC = () => {
   }, []);
 
   return (
-    <div className={cn(
-      "fixed bottom-0 left-0 right-0 z-50",
-      "bg-[#121212] border-t border-[#282828]",
-      isExpanded ? "h-[calc(100vh-4rem)]" : "h-20"
-    )}>
+    <div className={styles.container}>
       {/* Desktop Layout */}
-      <motion.div 
-        className="hidden md:flex w-full h-20 items-center px-4"
-        initial="hidden"
-        animate="visible"
-        variants={slideUpVariants}
-      >
-        {/* Left Section - Track Info */}
-        <div className="flex-1 flex items-center space-x-4 min-w-[180px] max-w-[300px]">
-          {currentTrack && (
-            <motion.div 
-              className="flex items-center space-x-4"
-              variants={fadeVariants}
-            >
-              <div 
-                className="relative w-14 h-14 rounded-lg overflow-hidden cursor-pointer group"
-                onClick={togglePlaybackMode}
-              >
-                <img 
-                  src={currentTrack.thumbnailUrl} 
-                  alt={currentTrack.title}
-                  className="w-full h-full object-cover"
-                />
+      <div className="hidden md:block">
+        <div className={styles.playerWrapper}>
+          <div className={styles.mainContent}>
+            {/* Left Section - Track Info */}
+            <div className="flex items-center min-w-[180px] max-w-[30%]">
+              {currentTrack && (
                 <motion.div 
-                  className="absolute inset-0 flex items-center justify-center bg-black/60"
+                  className="flex items-center"
                   initial={{ opacity: 0 }}
-                  whileHover={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
+                  animate={{ opacity: 1 }}
                 >
-                  {playbackMode === 'audio' ? (
-                    <Video className="w-5 h-5 text-white" />
-                  ) : (
-                    <Music className="w-5 h-5 text-white" />
-                  )}
-                </motion.div>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <motion.span 
-                  className="text-sm font-semibold text-white truncate max-w-[180px] hover:underline cursor-pointer"
-                  whileHover={{ scale: 1.02 }}
-                >
-                  {currentTrack.title}
-                </motion.span>
-                <motion.span 
-                  className="text-xs text-[#b3b3b3] truncate max-w-[180px] hover:text-white hover:underline cursor-pointer"
-                  whileHover={{ scale: 1.02 }}
-                >
-                  {currentTrack.artist}
-                </motion.span>
-              </div>
-              <motion.button
-                className="text-[#b3b3b3] hover:text-white transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Heart className="h-5 w-5" />
-              </motion.button>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Center Section - Player Controls */}
-        <div className="flex-[2] flex flex-col items-center justify-center max-w-[722px]">
-          <div className="flex items-center justify-center space-x-4 mb-2">
-            <motion.button
-              className={cn(
-                "text-[#b3b3b3] hover:text-white transition-colors",
-                isShuffle && "text-[#1ed760]"
-              )}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleShuffle}
-            >
-              <Shuffle className="h-4.5 w-4.5" />
-            </motion.button>
-            <motion.button
-              className="text-[#b3b3b3] hover:text-white transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handlePreviousTrack}
-            >
-              <SkipBack className="h-5 w-5" />
-            </motion.button>
-            <motion.button
-              className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:scale-105 transition-transform"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={togglePlay}
-            >
-              {isPlaying ? (
-                <Pause className="h-5 w-5 text-black" />
-              ) : (
-                <Play className="h-5 w-5 text-black ml-0.5" />
-              )}
-            </motion.button>
-            <motion.button
-              className="text-[#b3b3b3] hover:text-white transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleNext}
-            >
-              <SkipForward className="h-5 w-5" />
-            </motion.button>
-            <motion.button
-              className={cn(
-                "text-[#b3b3b3] hover:text-white transition-colors",
-                isRepeat && "text-[#1ed760]"
-              )}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleRepeat}
-            >
-              <Repeat className="h-4.5 w-4.5" />
-            </motion.button>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-full flex items-center space-x-2">
-            <span className="text-xs text-[#b3b3b3] w-[40px] text-right select-none">
-              {formatTime(currentTime)}
-            </span>
-            <div className="relative flex-1 group">
-              <div 
-                className="absolute w-full h-1 rounded-full bg-[#4d4d4d] cursor-pointer"
-                onClick={handleProgressSeek}
-              >
-                <motion.div 
-                  className="absolute h-full bg-[#b3b3b3] rounded-full group-hover:bg-[#1ed760]"
-                  style={{ width: `${progress}%` }}
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.1 }}
-                />
-                <motion.div 
-                  className="absolute h-3 w-3 bg-white rounded-full -top-1 opacity-0 group-hover:opacity-100"
-                  style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}
-                  transition={{ duration: 0.1 }}
-                />
-              </div>
-            </div>
-            <span className="text-xs text-[#b3b3b3] w-[40px] select-none">
-              {formatTime(duration)}
-            </span>
-          </div>
-        </div>
-
-        {/* Right Section - Additional Controls */}
-        <div className="flex-1 flex items-center justify-end space-x-4 min-w-[180px] max-w-[300px]">
-          <motion.button
-            className="text-[#b3b3b3] hover:text-white transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={toggleLyrics}
-          >
-            <Mic className="h-4 w-4" />
-          </motion.button>
-          <motion.button
-            className="text-[#b3b3b3] hover:text-white transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={toggleQueue}
-          >
-            <List className="h-4 w-4" />
-          </motion.button>
-          <div 
-            className="relative" 
-            onMouseEnter={() => setShowVolumeSlider(true)} 
-            onMouseLeave={() => setShowVolumeSlider(false)}
-          >
-            <motion.button
-              className="text-[#b3b3b3] hover:text-white transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleMute}
-            >
-              {isMuted || volume === 0 ? (
-                <Volume className="h-4 w-4" />
-              ) : volume < 0.5 ? (
-                <Volume1 className="h-4 w-4" />
-              ) : (
-                <Volume2 className="h-4 w-4" />
-              )}
-            </motion.button>
-            <AnimatePresence>
-              {showVolumeSlider && (
-                <motion.div 
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-[#282828] rounded-lg shadow-xl"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                >
-                  <div className="h-24 flex items-center justify-center">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={isMuted ? 0 : volume * 100}
-                      onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                      className="volume-slider"
-                      style={{
-                        WebkitAppearance: 'slider-vertical',
-                        writing-mode: 'bt-lr',
-                        width: '6px',
-                        height: '100%'
-                      }}
+                  <div className={styles.albumArt}>
+                    <img 
+                      src={currentTrack.thumbnailUrl} 
+                      alt={currentTrack.title}
+                      className="w-full h-full object-cover"
                     />
                   </div>
+                  <div className={styles.trackInfo}>
+                    <span className={styles.trackTitle}>{currentTrack.title}</span>
+                    <span className={styles.artistName}>{currentTrack.artist}</span>
+                  </div>
+                  <motion.button
+                    className="ml-4 text-[#b3b3b3] hover:text-white"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Heart className="h-5 w-5" />
+                  </motion.button>
                 </motion.div>
               )}
-            </AnimatePresence>
+            </div>
+
+            {/* Center Section - Player Controls */}
+            <div className="flex flex-col items-center max-w-[45%] w-full">
+              <div className={styles.controls}>
+                <motion.button
+                  className={cn(styles.controlButton, isShuffle && "text-[#1ed760]")}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleShuffle}
+                >
+                  <Shuffle className="h-4 w-4" />
+                </motion.button>
+                <motion.button
+                  className={styles.controlButton}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePreviousTrack}
+                >
+                  <SkipBack className="h-5 w-5" />
+                </motion.button>
+                <motion.button
+                  className={styles.playButton}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={togglePlay}
+                >
+                  {isPlaying ? (
+                    <Pause className="h-5 w-5 text-black" />
+                  ) : (
+                    <Play className="h-5 w-5 text-black ml-0.5" />
+                  )}
+                </motion.button>
+                <motion.button
+                  className={styles.controlButton}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleNext}
+                >
+                  <SkipForward className="h-5 w-5" />
+                </motion.button>
+                <motion.button
+                  className={cn(styles.controlButton, isRepeat && "text-[#1ed760]")}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleRepeat}
+                >
+                  <Repeat className="h-4 w-4" />
+                </motion.button>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="w-full flex items-center gap-2 mt-2 px-4">
+                <span className="text-xs text-[#b3b3b3] w-10 text-right">
+                  {formatTime(currentTime)}
+                </span>
+                <div className="relative flex-1">
+                  <div 
+                    className={styles.progressBar}
+                    onClick={handleProgressSeek}
+                  >
+                    <motion.div 
+                      className={styles.progressFill}
+                      style={{ width: `${progress}%` }}
+                    />
+                    <motion.div 
+                      className={styles.progressHandle}
+                      style={{ left: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="text-xs text-[#b3b3b3] w-10">
+                  {formatTime(duration)}
+                </span>
+              </div>
+            </div>
+
+            {/* Right Section - Additional Controls */}
+            <div className="flex items-center justify-end min-w-[180px] max-w-[30%]">
+              <div className="flex items-center gap-4">
+                <motion.button
+                  className={styles.controlButton}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleLyrics}
+                >
+                  <Mic className="h-4 w-4" />
+                </motion.button>
+                <motion.button
+                  className={styles.controlButton}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleQueue}
+                >
+                  <List className="h-4 w-4" />
+                </motion.button>
+                <div 
+                  className="relative"
+                  onMouseEnter={() => setShowVolumeSlider(true)}
+                  onMouseLeave={() => setShowVolumeSlider(false)}
+                >
+                  <motion.button
+                    className={styles.controlButton}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={toggleMute}
+                  >
+                    {isMuted || volume === 0 ? (
+                      <Volume className="h-4 w-4" />
+                    ) : volume < 0.5 ? (
+                      <Volume1 className="h-4 w-4" />
+                    ) : (
+                      <Volume2 className="h-4 w-4" />
+                    )}
+                  </motion.button>
+                  <AnimatePresence>
+                    {showVolumeSlider && (
+                      <motion.div 
+                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-[#282828] rounded-lg"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                      >
+                        <div className={styles.volumeSlider}>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={isMuted ? 0 : volume * 100}
+                            onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                            className="volume-slider"
+                            style={{
+                              WebkitAppearance: 'slider-vertical',
+                              writingMode: 'bt-lr',
+                              width: '6px',
+                              height: '100%',
+                              background: '#4d4d4d',
+                              borderRadius: '3px',
+                            }}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Mobile Layout */}
       <div className={cn(
         "md:hidden fixed transition-all duration-300 ease-in-out",
         isMiniPlayer 
-          ? "w-[280px] rounded-xl shadow-2xl bottom-20 right-4 z-50 overflow-hidden bg-[#282828]"
-          : "bottom-0 left-0 right-0 h-auto bg-[#121212] border-t border-[#282828]"
+          ? "w-[280px] rounded-xl shadow-2xl bottom-20 right-4 z-50 bg-[#282828]"
+          : "bottom-0 left-0 right-0 bg-[#121212] border-t border-[#282828]"
       )}>
         {currentTrack && (
           <motion.div 
-            className={cn(
-              "relative flex flex-col",
-              isMiniPlayer ? "p-3" : "p-4"
-            )}
+            className={cn("p-4", isMiniPlayer && "p-3")}
             drag={isMiniPlayer}
             dragConstraints={{
               top: 0,
@@ -1219,41 +1199,25 @@ const Player: React.FC = () => {
               y: 0
             }}
           >
-            {/* Main Content */}
-            <div className="flex items-center space-x-3">
-              {/* Album Art */}
+            <div className="flex items-center gap-4">
               <motion.div 
-                className={cn(
-                  "relative rounded-lg overflow-hidden cursor-pointer group",
+                className={cn("relative rounded-lg overflow-hidden", 
                   isMiniPlayer ? "w-12 h-12" : "w-14 h-14"
                 )}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={!isDragging ? togglePlaybackMode : undefined}
               >
                 <img 
-                  src={currentTrack.thumbnailUrl} 
+                  src={currentTrack.thumbnailUrl}
                   alt={currentTrack.title}
                   className="w-full h-full object-cover"
                 />
-                <motion.div 
-                  className="absolute inset-0 flex items-center justify-center bg-black/60"
-                  initial={{ opacity: 0 }}
-                  whileHover={{ opacity: 1 }}
-                >
-                  {playbackMode === 'audio' ? (
-                    <Video className="w-5 h-5 text-white" />
-                  ) : (
-                    <Music className="w-5 h-5 text-white" />
-                  )}
-                </motion.div>
               </motion.div>
-
-              {/* Track Info */}
+              
               <div className="flex-1 min-w-0">
                 <motion.h3 
                   className={cn(
-                    "font-semibold truncate text-white",
+                    "text-white font-medium truncate",
                     isMiniPlayer ? "text-sm" : "text-base"
                   )}
                   whileHover={{ scale: 1.02 }}
@@ -1262,7 +1226,7 @@ const Player: React.FC = () => {
                 </motion.h3>
                 <motion.p 
                   className={cn(
-                    "text-[#b3b3b3] truncate hover:text-white",
+                    "text-[#b3b3b3] truncate",
                     isMiniPlayer ? "text-xs" : "text-sm"
                   )}
                   whileHover={{ scale: 1.02 }}
@@ -1271,13 +1235,9 @@ const Player: React.FC = () => {
                 </motion.p>
               </div>
 
-              {/* Controls */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <motion.button
-                  className={cn(
-                    "text-white rounded-full p-2",
-                    isMiniPlayer ? "h-8 w-8" : "h-10 w-10"
-                  )}
+                  className="text-white p-2 rounded-full"
                   whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
                   whileTap={{ scale: 0.95 }}
                   onClick={togglePlay}
@@ -1290,7 +1250,7 @@ const Player: React.FC = () => {
                 </motion.button>
                 {!isMiniPlayer && (
                   <motion.button
-                    className="text-white rounded-full p-2 h-10 w-10"
+                    className="text-white p-2 rounded-full"
                     whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleNext}
@@ -1299,10 +1259,7 @@ const Player: React.FC = () => {
                   </motion.button>
                 )}
                 <motion.button
-                  className={cn(
-                    "text-white rounded-full p-2",
-                    isMiniPlayer ? "h-8 w-8" : "h-10 w-10"
-                  )}
+                  className="text-white p-2 rounded-full"
                   whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
                   whileTap={{ scale: 0.95 }}
                   onClick={toggleMiniPlayer}
