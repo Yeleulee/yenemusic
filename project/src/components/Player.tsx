@@ -533,7 +533,7 @@ const Player: React.FC = () => {
     setTimeout(() => {
       if (youtubePlayerRef.current) {
         youtubePlayerRef.current.seekTo(currentTime, true);
-        if (isPlaying) {
+      if (isPlaying) {
           youtubePlayerRef.current.playVideo();
         }
       }
@@ -557,7 +557,7 @@ const Player: React.FC = () => {
       try {
       if (isPlaying) {
           youtubePlayerRef.current.playVideo();
-        } else {
+      } else {
           youtubePlayerRef.current.pauseVideo();
         }
       } catch (e) {
@@ -569,7 +569,7 @@ const Player: React.FC = () => {
   // Toggle play/pause
   const togglePlay = useCallback(() => {
     if (!currentTrack) return;
-    setIsPlaying(!isPlaying);
+      setIsPlaying(!isPlaying);
   }, [currentTrack, isPlaying, setIsPlaying]);
 
   const toggleFullScreen = useCallback(() => {
@@ -996,10 +996,10 @@ const Player: React.FC = () => {
                   <div className={styles.albumArt}>
                     <img 
                       src={currentTrack.thumbnailUrl} 
-                      alt={currentTrack.title}
+            alt={currentTrack.title}
                       className="w-full h-full object-cover"
-                    />
-                  </div>
+          />
+          </div>
                   <div className={styles.trackInfo}>
                     <span className={styles.trackTitle}>{currentTrack.title}</span>
                     <span className={styles.artistName}>{currentTrack.artist}</span>
@@ -1013,7 +1013,7 @@ const Player: React.FC = () => {
                   </motion.button>
                 </motion.div>
               )}
-            </div>
+        </div>
 
             {/* Center Section - Player Controls */}
             <div className="flex flex-col items-center max-w-[45%] w-full">
@@ -1038,9 +1038,9 @@ const Player: React.FC = () => {
                   className={styles.playButton}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={togglePlay}
-                >
-                  {isPlaying ? (
+            onClick={togglePlay}
+          >
+            {isPlaying ? (
                     <Pause className="h-5 w-5 text-black" />
                   ) : (
                     <Play className="h-5 w-5 text-black ml-0.5" />
@@ -1062,8 +1062,8 @@ const Player: React.FC = () => {
                 >
                   <Repeat className="h-4 w-4" />
                 </motion.button>
-              </div>
-              
+        </div>
+
               {/* Progress Bar */}
               <div className="w-full flex items-center gap-2 mt-2 px-4">
                 <span className="text-xs text-[#b3b3b3] w-10 text-right">
@@ -1137,9 +1137,9 @@ const Player: React.FC = () => {
                         exit={{ opacity: 0, y: 10 }}
                       >
                         <div className={styles.volumeSlider}>
-                          <input
-                            type="range"
-                            min="0"
+          <input
+            type="range"
+            min="0"
                             max="100"
                             value={isMuted ? 0 : volume * 100}
                             onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
@@ -1152,12 +1152,12 @@ const Player: React.FC = () => {
                               background: '#4d4d4d',
                               borderRadius: '3px',
                             }}
-                          />
-                        </div>
+          />
+        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
+      </div>
               </div>
             </div>
           </div>

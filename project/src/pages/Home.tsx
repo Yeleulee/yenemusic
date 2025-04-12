@@ -239,6 +239,8 @@ export const Home = () => {
     const timer = setTimeout(() => {
       if (searchQuery) {
         handleSearch(searchQuery);
+      } else {
+        setSearchResults([]);
       }
     }, 500);
 
@@ -318,7 +320,7 @@ export const Home = () => {
     }
     
     try {
-      setIsLoading(true);
+      setIsSearching(true);
       console.log("Searching for:", query);
       const results = await searchMusic(query);
       
@@ -328,15 +330,15 @@ export const Home = () => {
         setSearchResults([]);
       } else {
         console.log(`Received ${results.length} search results for query: "${query}"`, results);
-    setSearchResults(results);
-    setError(null);
+        setSearchResults(results);
+        setError(null);
       }
     } catch (err) {
       console.error('Error searching music:', err);
       setError('Search failed. Please check your API configuration.');
       setSearchResults([]);
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
     }
   };
   
