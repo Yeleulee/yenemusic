@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume, Video, Music, AlertTriangle, Maximize, Minimize, Headphones, Youtube, ChevronUp, ChevronDown, Heart, Share, List, Repeat, Shuffle, Loader, MessageSquare, X, Home, Search, Library, Settings, Volume1, Volume2 } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Volume, Video, Music, AlertTriangle, Maximize, Minimize, Headphones, Youtube, ChevronUp, ChevronDown, Heart, Share, List, Repeat, Shuffle, Loader, MessageSquare, X, Home, Search, Library, Settings, Volume1, Volume2, Plus, RotateCcw, RotateCw, SwitchHorizontal } from 'lucide-react';
 import { usePlayerStore } from '../store/playerStore';
 import { useNavigate } from 'react-router-dom';
 import { getRecommendations } from '../lib/youtube';
@@ -8,6 +8,10 @@ import { Button } from '../components/ui/button';
 import { Slider } from '../components/ui/slider';
 import { YouTube } from 'react-youtube';
 import { Mic } from 'lucide-react';
+import { DragHandleDots2Icon } from "@radix-ui/react-icons";
+import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
+import { Canvas } from '@react-three/fiber';
+import { useSpring, animated } from '@react-spring/three';
 
 // Track preloading state
 const PRELOAD_NEXT_TRACK = true;
@@ -38,19 +42,94 @@ const mockLyrics = [
   { time: 118, text: "Where the sun still shines" },
 ];
 
-// Add to the interface PlayerStore
+// Update the PlayerStore interface
 interface PlayerStore {
   // ... existing properties ...
-  recommendations: YouTubeVideo[];
-  setRecommendations: (recommendations: YouTubeVideo[]) => void;
+  history: YouTubeVideo[];
+  playlists: { id: string; name: string; tracks: YouTubeVideo[] }[];
+  addToHistory: (track: YouTubeVideo) => void;
+  createPlaylist: (name: string) => void;
+  addToPlaylist: (playlistId: string, track: YouTubeVideo) => void;
+  removeFromPlaylist: (playlistId: string, trackId: string) => void;
 }
 
 // Update the usePlayerStore hook
-export const usePlayerStore = create<PlayerStore>((set) => ({
+export const usePlayerStore = create<PlayerStore>((set, get) => ({
   // ... existing properties ...
-  recommendations: [],
-  setRecommendations: (recommendations) => set({ recommendations }),
+  history: [],
+  playlists: [],
+  addToHistory: (track) => set((state) => {
+    const newHistory = [track, ...state.history.filter(t => t.id !== track.id)].slice(0, 50);
+    return { history: newHistory };
+  }),
+  createPlaylist: (name) => set((state) => ({
+    playlists: [...state.playlists, { id: Date.now().toString(), name, tracks: [] }]
+  })),
+  addToPlaylist: (playlistId, track) => set((state) => ({
+    playlists: state.playlists.map(playlist =>
+      playlist.id === playlistId
+        ? { ...playlist, tracks: [...playlist.tracks, track] }
+        : playlist
+    )
+  })),
+  removeFromPlaylist: (playlistId, trackId) => set((state) => ({
+    playlists: state.playlists.map(playlist =>
+      playlist.id === playlistId
+        ? { ...playlist, tracks: playlist.tracks.filter(t => t.id !== trackId) }
+        : playlist
+    )
+  }))
 }));
+
+// Add visualization components
+const AudioVisualizer = ({ isPlaying, volume }: { isPlaying: boolean; volume: number }) => {
+  const bars = useMemo(() => Array.from({ length: 32 }, (_, i) => i), []);
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      <Canvas>
+        <ambientLight intensity={0.5} />
+        <pointLight position={[10, 10, 10]} />
+        <group position={[0, 0, 0]}>
+          {bars.map((i) => (
+            <AnimatedBar 
+              key={i} 
+              index={i} 
+              isPlaying={isPlaying}
+              volume={volume}
+            />
+          ))}
+        </group>
+      </Canvas>
+    </div>
+  );
+};
+
+const AnimatedBar = ({ index, isPlaying, volume }: { index: number; isPlaying: boolean; volume: number }) => {
+  const position = [(index - 16) * 0.2, 0, 0];
+  const maxHeight = 2 + Math.sin(index * 0.2) * 0.5;
+  
+  const { height } = useSpring({
+    height: isPlaying ? maxHeight * Math.random() * volume : 0.1,
+    config: {
+      tension: 300,
+      friction: 20,
+    },
+  });
+
+  return (
+    <animated.mesh position={position}>
+      <boxGeometry args={[0.1, 1, 0.1]} />
+      <animated.meshStandardMaterial 
+        color={`hsl(${index * 8}, 70%, 50%)`}
+        scale={[1, height, 1]}
+      />
+    </animated.mesh>
+  );
+};
+
+// Add crossfade functionality
+const CROSSFADE_DURATION = 3000; // 3 seconds
 
 const Player: React.FC = () => {
   // Refs
@@ -76,7 +155,13 @@ const Player: React.FC = () => {
     previousTrack,
     queue,
     recommendations,
-    setRecommendations
+    setRecommendations,
+    history,
+    playlists,
+    addToHistory,
+    createPlaylist,
+    addToPlaylist,
+    removeFromPlaylist
   } = usePlayerStore();
   
   // UI States
@@ -110,6 +195,21 @@ const Player: React.FC = () => {
   const [isRepeat, setIsRepeat] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [isMiniPlayer, setIsMiniPlayer] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragControls = useDragControls();
+
+  // Add new state variables
+  const [crossfadeEnabled, setCrossfadeEnabled] = useState(true);
+  const crossfadeGainNode = useRef<GainNode | null>(null);
+  const audioContext = useRef<AudioContext | null>(null);
+
+  // Add new state variables
+  const [showHistory, setShowHistory] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
 
   // Load YouTube API
   useEffect(() => {
@@ -689,60 +789,163 @@ const Player: React.FC = () => {
     setIsRepeat(!isRepeat);
   }, [isRepeat]);
 
-  // Update the handleNext function to include shuffle and repeat
+  // Update the handleNext function to include crossfade
   const handleNext = useCallback(() => {
+    if (currentTrack) {
+      addToHistory(currentTrack);
+    }
     if (!youtubePlayerRef.current) return;
 
-    if (isRepeat) {
-      // Replay current track
-      youtubePlayerRef.current.seekTo(0);
-      youtubePlayerRef.current.playVideo();
-      return;
-    }
-
-    if (isShuffle) {
-      // Combine recommendations and queue, then pick random
-      const allTracks = [...recommendations, ...queue];
-      if (allTracks.length > 0) {
-        const randomIndex = Math.floor(Math.random() * allTracks.length);
-        const nextTrack = allTracks[randomIndex];
-        setCurrentTrack(nextTrack);
+    const startCrossfade = () => {
+      if (crossfadeEnabled && crossfadeGainNode.current) {
+        // Start fade out
+        crossfadeGainNode.current.gain.linearRampToValueAtTime(
+          0,
+          audioContext.current!.currentTime + CROSSFADE_DURATION / 1000
+        );
         
-        // Remove the track from its original array
-        if (randomIndex < recommendations.length) {
-          setRecommendations(recommendations.filter((_, i) => i !== randomIndex));
+        // After fade out, play next track
+        setTimeout(() => {
+          if (isRepeat) {
+            youtubePlayerRef.current?.seekTo(0);
+            youtubePlayerRef.current?.playVideo();
+          } else if (isShuffle) {
+            // ... existing shuffle logic ...
+          } else {
+            // ... existing next track logic ...
+          }
+          
+          // Reset gain for next track
+          if (crossfadeGainNode.current) {
+            crossfadeGainNode.current.gain.setValueAtTime(1, audioContext.current!.currentTime);
+          }
+        }, CROSSFADE_DURATION);
+      } else {
+        // Immediate switch without crossfade
+        if (isRepeat) {
+          youtubePlayerRef.current?.seekTo(0);
+          youtubePlayerRef.current?.playVideo();
+        } else if (isShuffle) {
+          // ... existing shuffle logic ...
         } else {
-          setQueue(queue.filter((_, i) => i !== (randomIndex - recommendations.length)));
+          // ... existing next track logic ...
         }
+      }
+    };
+
+    startCrossfade();
+  }, [crossfadeEnabled, isRepeat, isShuffle, currentTrack, addToHistory]);
+
+  // Add toggle functions
+  const toggleQueue = useCallback(() => {
+    setShowQueue(!showQueue);
+    if (!showQueue) {
+      setShowPlaylist(false);
+    }
+  }, [showQueue]);
+
+  const togglePlaylist = useCallback(() => {
+    setShowPlaylist(!showPlaylist);
+    if (!showPlaylist) {
+      setShowQueue(false);
+    }
+  }, [showPlaylist]);
+
+  // Add toggle function for history
+  const toggleHistory = useCallback(() => {
+    setShowHistory(!showHistory);
+    if (!showHistory) {
+      setShowQueue(false);
+      setShowPlaylist(false);
+    }
+  }, [showHistory]);
+
+  // Add keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if not typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
-    }
 
-    // Default behavior
-    if (recommendations.length > 0) {
-      const nextTrack = recommendations[0];
-      setCurrentTrack(nextTrack);
-      setRecommendations(recommendations.slice(1));
-      return;
-    }
+      switch (e.key.toLowerCase()) {
+        case ' ':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'k':
+          togglePlay();
+          break;
+        case 'j':
+          // Rewind 10 seconds
+          if (youtubePlayerRef.current) {
+            const newTime = Math.max(0, currentTime - 10);
+            youtubePlayerRef.current.seekTo(newTime, true);
+          }
+          break;
+        case 'l':
+          // Forward 10 seconds
+          if (youtubePlayerRef.current) {
+            const newTime = Math.min(duration, currentTime + 10);
+            youtubePlayerRef.current.seekTo(newTime, true);
+          }
+          break;
+        case 'm':
+          toggleMute();
+          break;
+        case 'f':
+          if (playbackMode === 'video' && isExpanded) {
+            toggleFullScreen();
+          }
+          break;
+        case 'escape':
+          if (playbackMode === 'video' && isExpanded) {
+            toggleExpandPlayer();
+          }
+          break;
+        case 'arrowup':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleVolumeChange(Math.min(100, (volume * 100) + 10));
+          }
+          break;
+        case 'arrowdown':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleVolumeChange(Math.max(0, (volume * 100) - 10));
+          }
+          break;
+      }
+    };
 
-    if (queue.length > 0) {
-      const nextTrack = queue[0];
-      setCurrentTrack(nextTrack);
-      setQueue(queue.slice(1));
-      return;
-    }
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [togglePlay, currentTime, duration, volume, playbackMode, isExpanded, toggleMute, toggleFullScreen, toggleExpandPlayer, handleVolumeChange]);
 
-    // Get new recommendations if needed
-    if (currentTrack) {
-      getRecommendations(currentTrack).then((newRecommendations) => {
-        if (newRecommendations.length > 0) {
-          setCurrentTrack(newRecommendations[0]);
-          setRecommendations(newRecommendations.slice(1));
-        }
-      });
+  // Add double click handler for video fullscreen
+  const handleVideoDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (playbackMode === 'video' && isExpanded) {
+      toggleFullScreen();
     }
-  }, [currentTrack, queue, recommendations, isRepeat, isShuffle, youtubePlayerRef]);
+  }, [playbackMode, isExpanded, toggleFullScreen]);
+
+  // Add mini player toggle function
+  const toggleMiniPlayer = useCallback(() => {
+    if (playbackMode === 'video') {
+      setPlaybackMode('audio');
+    }
+    setIsMiniPlayer(!isMiniPlayer);
+  }, [isMiniPlayer, playbackMode]);
+
+  // Initialize audio context and gain node
+  useEffect(() => {
+    if (!audioContext.current) {
+      audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      crossfadeGainNode.current = audioContext.current.createGain();
+      crossfadeGainNode.current.connect(audioContext.current.destination);
+    }
+  }, []);
 
   return (
     <div className={cn(
@@ -905,36 +1108,80 @@ const Player: React.FC = () => {
               <ChevronUp className="h-5 w-5" />
             )}
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleQueue}
+            className={cn(showQueue && "text-primary")}
+          >
+            <List className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCrossfadeEnabled(!crossfadeEnabled)}
+            className={cn(crossfadeEnabled && "text-primary")}
+          >
+            <SwitchHorizontal className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 
       {/* Mobile Layout */}
-      <div className="md:hidden flex items-center justify-between w-full h-20 px-4">
+      <div className={cn(
+        "md:hidden w-full transition-all duration-300",
+        isMiniPlayer ? "fixed bottom-20 right-4 w-64 rounded-lg shadow-lg" : "h-20"
+      )}>
         {currentTrack && (
-          <>
-            <div className="flex items-center space-x-3">
+          <motion.div 
+            className={cn(
+              "flex items-center bg-background/95 backdrop-blur",
+              isMiniPlayer ? "p-2 rounded-lg" : "px-4 h-20"
+            )}
+            drag={isMiniPlayer ? "y" : false}
+            dragConstraints={{ top: 0, bottom: window.innerHeight - 100 }}
+            dragElastic={0.2}
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={() => setIsDragging(false)}
+          >
+            <div className="flex items-center space-x-3 flex-1">
               <div 
                 className="relative cursor-pointer group"
-                onClick={togglePlaybackMode}
+                onClick={!isDragging ? togglePlaybackMode : undefined}
               >
                 <img 
                   src={currentTrack.thumbnailUrl} 
                   alt={currentTrack.title}
-                  className="w-12 h-12 rounded-md object-cover"
+                  className={cn(
+                    "rounded-md object-cover",
+                    isMiniPlayer ? "w-10 h-10" : "w-12 h-12"
+                  )}
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
                   {playbackMode === 'audio' ? (
-                    <Video className="w-4 h-4 text-white" />
+                    <Video className={cn(
+                      "text-white",
+                      isMiniPlayer ? "w-3 h-3" : "w-4 h-4"
+                    )} />
                   ) : (
-                    <Music className="w-4 h-4 text-white" />
+                    <Music className={cn(
+                      "text-white",
+                      isMiniPlayer ? "w-3 h-3" : "w-4 h-4"
+                    )} />
                   )}
                 </div>
               </div>
-              <div className="flex flex-col">
-                <span className="font-medium text-sm truncate max-w-[150px]">
+              <div className="flex flex-col min-w-0">
+                <span className={cn(
+                  "font-medium truncate",
+                  isMiniPlayer ? "text-xs max-w-[120px]" : "text-sm max-w-[150px]"
+                )}>
                   {currentTrack.title}
                 </span>
-                <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                <span className={cn(
+                  "text-muted-foreground truncate",
+                  isMiniPlayer ? "text-[10px] max-w-[120px]" : "text-xs max-w-[150px]"
+                )}>
                   {currentTrack.artist}
                 </span>
               </div>
@@ -942,31 +1189,46 @@ const Player: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Button
                 variant="ghost"
-                size="icon"
+                size={isMiniPlayer ? "sm" : "icon"}
                 onClick={togglePlay}
+                className={isMiniPlayer ? "h-8 w-8" : ""}
               >
                 {isPlaying ? (
-                  <Pause className="h-5 w-5" />
+                  <Pause className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
                 ) : (
-                  <Play className="h-5 w-5" />
+                  <Play className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
                 )}
               </Button>
+              {!isMiniPlayer && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleNext}
+                >
+                  <SkipForward className="h-5 w-5" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={handleNext}
+                size={isMiniPlayer ? "sm" : "icon"}
+                onClick={toggleMiniPlayer}
+                className={isMiniPlayer ? "h-8 w-8" : ""}
               >
-                <SkipForward className="h-5 w-5" />
+                {isMiniPlayer ? (
+                  <Maximize className="h-4 w-4" />
+                ) : (
+                  <Minimize className="h-5 w-5" />
+                )}
               </Button>
             </div>
-          </>
+          </motion.div>
         )}
       </div>
 
       {/* Video Player Container */}
       {playbackMode === 'video' && isExpanded && (
         <div className="fixed inset-0 bg-black z-50">
-          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent">
+          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent opacity-100 transition-opacity duration-300 hover:opacity-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Button
@@ -982,30 +1244,49 @@ const Player: React.FC = () => {
                   <div className="text-sm opacity-80">{currentTrack?.artist}</div>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20"
-                onClick={toggleExpandPlayer}
-              >
-                <ChevronDown className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/20"
+                  onClick={toggleFullScreen}
+                >
+                  {fullScreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/20"
+                  onClick={toggleExpandPlayer}
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </div>
           <div 
             id="youtube-player-visible" 
-            className="w-full h-full"
+            className="w-full h-full cursor-pointer"
             onClick={togglePlay}
+            onDoubleClick={handleVideoDoubleClick}
           />
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-100 transition-opacity duration-300 hover:opacity-100">
             <div className="flex flex-col space-y-2">
-              <Slider
-                value={[currentTime]}
-                max={duration}
-                step={1}
-                onValueChange={handleProgressSeek}
-                className="w-full"
-              />
+              <div className="flex items-center space-x-2">
+                <span className="text-white text-sm">
+                  {formatTime(currentTime)}
+                </span>
+                <Slider
+                  value={[currentTime]}
+                  max={duration}
+                  step={1}
+                  onValueChange={handleProgressSeek}
+                  className="flex-1"
+                />
+                <span className="text-white text-sm">
+                  {formatTime(duration)}
+                </span>
+              </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <Button
@@ -1020,28 +1301,345 @@ const Player: React.FC = () => {
                       <Play className="h-6 w-6" />
                     )}
                   </Button>
-                  <span className="text-white text-sm">
-                    {formatTime(currentTime)} / {formatTime(duration)}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
                   <Button
                     variant="ghost"
                     size="icon"
                     className="text-white hover:bg-white/20"
-                    onClick={toggleMute}
+                    onClick={() => {
+                      if (youtubePlayerRef.current) {
+                        const newTime = Math.max(0, currentTime - 10);
+                        youtubePlayerRef.current.seekTo(newTime, true);
+                      }
+                    }}
                   >
-                    {isMuted || volume === 0 ? (
-                      <Volume className="h-5 w-5" />
-                    ) : volume < 0.5 ? (
-                      <Volume1 className="h-5 w-5" />
-                    ) : (
-                      <Volume2 className="h-5 w-5" />
+                    <RotateCcw className="h-5 w-5" />
+                    <span className="absolute text-xs">10</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white hover:bg-white/20"
+                    onClick={() => {
+                      if (youtubePlayerRef.current) {
+                        const newTime = Math.min(duration, currentTime + 10);
+                        youtubePlayerRef.current.seekTo(newTime, true);
+                      }
+                    }}
+                  >
+                    <RotateCw className="h-5 w-5" />
+                    <span className="absolute text-xs">10</span>
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="relative" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-white hover:bg-white/20"
+                      onClick={toggleMute}
+                    >
+                      {isMuted || volume === 0 ? (
+                        <Volume className="h-5 w-5" />
+                      ) : volume < 0.5 ? (
+                        <Volume1 className="h-5 w-5" />
+                      ) : (
+                        <Volume2 className="h-5 w-5" />
+                      )}
+                    </Button>
+                    {showVolumeSlider && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-black/80 rounded-lg">
+                        <Slider
+                          orientation="vertical"
+                          value={[isMuted ? 0 : volume * 100]}
+                          max={100}
+                          step={1}
+                          className="h-24"
+                          onValueChange={(value) => handleVolumeChange(value[0])}
+                        />
+                      </div>
                     )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white hover:bg-white/20"
+                    onClick={toggleQueue}
+                  >
+                    <List className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Queue/Playlist/History Panel */}
+      {isExpanded && (showQueue || showPlaylist || showHistory) && (
+        <div className="absolute right-0 top-0 bottom-0 w-80 bg-background/95 border-l border-border/40 overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-border/40">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(showQueue && "text-primary")}
+                onClick={toggleQueue}
+              >
+                Queue
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(showPlaylist && "text-primary")}
+                onClick={togglePlaylist}
+              >
+                Playlists
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(showHistory && "text-primary")}
+                onClick={toggleHistory}
+              >
+                History
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setShowQueue(false);
+                setShowPlaylist(false);
+                setShowHistory(false);
+              }}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-2">
+            {showQueue && (
+              <div className="space-y-2">
+                {/* Current Track */}
+                {currentTrack && (
+                  <div className="p-2">
+                    <div className="text-sm font-medium text-muted-foreground mb-4">Now Playing</div>
+                    <div className="flex items-center space-x-3">
+                      <img 
+                        src={currentTrack.thumbnailUrl} 
+                        alt={currentTrack.title}
+                        className="w-12 h-12 rounded-md object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{currentTrack.title}</div>
+                        <div className="text-sm text-muted-foreground truncate">{currentTrack.artist}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Queue List */}
+                <div className="border-t border-border/40 pt-4">
+                  <div className="text-sm font-medium text-muted-foreground mb-2">Next Up</div>
+                  <Reorder.Group 
+                    axis="y" 
+                    values={queue} 
+                    onReorder={setQueue}
+                    className="space-y-1"
+                  >
+                    {queue.map((track) => (
+                      <Reorder.Item
+                        key={track.id}
+                        value={track}
+                        dragListener={false}
+                        dragControls={dragControls}
+                      >
+                        <div className="flex items-center space-x-3 p-2 hover:bg-accent/50 rounded-md group">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                            onPointerDown={(e) => dragControls.start(e)}
+                          >
+                            <DragHandleDots2Icon className="h-4 w-4" />
+                          </Button>
+                          <img 
+                            src={track.thumbnailUrl} 
+                            alt={track.title}
+                            className="w-10 h-10 rounded-md object-cover"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{track.title}</div>
+                            <div className="text-sm text-muted-foreground truncate">{track.artist}</div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="opacity-0 group-hover:opacity-100"
+                            onClick={() => {
+                              setQueue(queue.filter(t => t.id !== track.id));
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </Reorder.Item>
+                    ))}
+                  </Reorder.Group>
+                </div>
+
+                {/* Recommendations */}
+                {recommendations.length > 0 && (
+                  <div className="border-t border-border/40 pt-4 mt-4">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Recommended</div>
+                    {recommendations.map((track) => (
+                      <div 
+                        key={track.id} 
+                        className="flex items-center space-x-3 p-2 hover:bg-accent/50 rounded-md group cursor-pointer"
+                        onClick={() => {
+                          setCurrentTrack(track);
+                          setRecommendations(recommendations.filter(t => t.id !== track.id));
+                        }}
+                      >
+                        <img 
+                          src={track.thumbnailUrl} 
+                          alt={track.title}
+                          className="w-10 h-10 rounded-md object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{track.title}</div>
+                          <div className="text-sm text-muted-foreground truncate">{track.artist}</div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQueue([...queue, track]);
+                            setRecommendations(recommendations.filter(t => t.id !== track.id));
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {showPlaylist && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 p-2">
+                  <input
+                    type="text"
+                    placeholder="New playlist name"
+                    value={newPlaylistName}
+                    onChange={(e) => setNewPlaylistName(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-md bg-accent/50"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (newPlaylistName.trim()) {
+                        createPlaylist(newPlaylistName.trim());
+                        setNewPlaylistName('');
+                      }
+                    }}
+                  >
+                    Create
+                  </Button>
+                </div>
+                
+                {playlists.map((playlist) => (
+                  <div key={playlist.id} className="space-y-2">
+                    <div
+                      className="flex items-center justify-between p-2 hover:bg-accent/50 rounded-md cursor-pointer"
+                      onClick={() => setSelectedPlaylist(selectedPlaylist === playlist.id ? null : playlist.id)}
+                    >
+                      <span className="font-medium">{playlist.name}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {playlist.tracks.length} tracks
+                      </span>
+                    </div>
+                    
+                    {selectedPlaylist === playlist.id && (
+                      <div className="pl-4 space-y-1">
+                        {playlist.tracks.map((track) => (
+                          <div
+                            key={track.id}
+                            className="flex items-center space-x-3 p-2 hover:bg-accent/50 rounded-md group"
+                          >
+                            <img
+                              src={track.thumbnailUrl}
+                              alt={track.title}
+                              className="w-10 h-10 rounded-md object-cover"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{track.title}</div>
+                              <div className="text-sm text-muted-foreground truncate">
+                                {track.artist}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100"
+                              onClick={() => removeFromPlaylist(playlist.id, track.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {showHistory && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground mb-2">
+                  Recently Played
+                </div>
+                {history.map((track) => (
+                  <div
+                    key={track.id}
+                    className="flex items-center space-x-3 p-2 hover:bg-accent/50 rounded-md group cursor-pointer"
+                    onClick={() => {
+                      setCurrentTrack(track);
+                      setIsPlaying(true);
+                    }}
+                  >
+                    <img
+                      src={track.thumbnailUrl}
+                      alt={track.title}
+                      className="w-10 h-10 rounded-md object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{track.title}</div>
+                      <div className="text-sm text-muted-foreground truncate">
+                        {track.artist}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQueue([...queue, track]);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
