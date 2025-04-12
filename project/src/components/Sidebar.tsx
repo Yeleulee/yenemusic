@@ -27,7 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
       {/* Logo */}
       <div className="flex items-center gap-2 px-3 py-4 mb-6">
         <Music className="h-8 w-8 text-red-500" />
-        <span className="text-white text-xl font-bold">yenein</span>
+        <span className="text-white text-xl font-bold">yene music</span>
       </div>
       
       {/* Main Navigation */}
