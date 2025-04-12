@@ -69,6 +69,7 @@ export const Player = () => {
   const [playerReady, setPlayerReady] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [currentLyricIndex, setCurrentLyricIndex] = useState(0);
+  const [youtubePlayerInstance, setYoutubePlayerInstance] = useState<any>(null);
 
   // Load YouTube API
   useEffect(() => {
@@ -174,31 +175,48 @@ export const Player = () => {
     }, 250);
   }, []);
 
+  // Clean up previous player if it exists
+  const cleanupPreviousPlayer = useCallback(() => {
+    // Remove any existing player divs
+    const existingPlayer = document.getElementById('youtube-player-container');
+    if (existingPlayer) {
+      existingPlayer.remove();
+    }
+  }, []);
+
   // Initialize YouTube player when API is ready and video ID changes
   useEffect(() => {
-    if (isYouTubeAPIReady && videoId && !youtubePlayerRef.current) {
+    if (isYouTubeAPIReady && videoId) {
       setPlayerReady(false);
       
+      // Clean up previous player to avoid conflicts
+      cleanupPreviousPlayer();
+      
       // Create container if not exists
-      if (!document.getElementById('youtube-player-container')) {
-        const container = document.createElement('div');
-        container.id = 'youtube-player-container';
-        container.style.width = '100%';
-        container.style.height = '100%';
-        container.style.position = 'absolute';
-        document.body.appendChild(container);
+      const containerId = playbackMode === 'video' ? 'youtube-player-visible' : 'youtube-player-hidden';
+      const container = document.getElementById(containerId);
+      
+      if (!container) {
+        console.error(`Container with ID ${containerId} not found`);
+        return;
       }
+      
+      // Create a new div for the YouTube player
+      const playerDiv = document.createElement('div');
+      playerDiv.id = 'youtube-player-container';
+      container.appendChild(playerDiv);
 
       // Initialize the player
-      console.log("Creating YouTube player for video:", videoId);
-      youtubePlayerRef.current = new window.YT.Player('youtube-player-container', {
+      console.log(`Creating YouTube player for video: ${videoId} in ${playbackMode} mode`);
+      
+      const newPlayer = new window.YT.Player('youtube-player-container', {
         videoId: videoId,
         width: '100%',
         height: '100%',
         playerVars: {
           'playsinline': 1,
           'controls': 0,
-          'autoplay': 0,
+          'autoplay': 1,
           'disablekb': 1,
           'modestbranding': 1,
           'rel': 0,
@@ -212,20 +230,9 @@ export const Player = () => {
           'onError': onPlayerError
         }
       });
-    } else if (youtubePlayerRef.current && videoId) {
-      // Just load a new video if player already exists
-      try {
-        youtubePlayerRef.current.loadVideoById({
-          videoId: videoId,
-          startSeconds: currentTimeRef.current
-        });
-        
-        if (!isPlaying) {
-          youtubePlayerRef.current.pauseVideo();
-        }
-      } catch (e) {
-        console.error("Error loading new video:", e);
-      }
+      
+      youtubePlayerRef.current = newPlayer;
+      setYoutubePlayerInstance(newPlayer);
     }
 
     function onPlayerReady(event: any) {
@@ -236,7 +243,7 @@ export const Player = () => {
       player.setVolume(volume * 100);
       
       // Position the iframe correctly
-      const iframe = document.getElementById('youtube-player-container') as HTMLIFrameElement;
+      const iframe = document.querySelector('#youtube-player-container iframe') as HTMLIFrameElement;
       if (iframe) {
         iframe.style.width = '100%';
         iframe.style.height = '100%';
@@ -245,14 +252,6 @@ export const Player = () => {
         iframe.style.left = '0';
         iframe.style.border = 'none';
         iframe.style.zIndex = '1';
-        
-        // Move iframe to video container
-        if (videoContainerRef.current && videoContainerRef.current.contains(iframe)) {
-          console.log("Player already in container");
-        } else if (videoContainerRef.current) {
-          console.log("Moving player to container");
-          videoContainerRef.current.appendChild(iframe);
-        }
       }
       
       // Start progress tracking
@@ -264,6 +263,8 @@ export const Player = () => {
       // Start playback if needed
       if (isPlaying) {
         player.playVideo();
+      } else {
+        player.pauseVideo();
       }
     }
 
@@ -301,7 +302,79 @@ export const Player = () => {
         progressInterval.current = null;
       }
     };
-  }, [isYouTubeAPIReady, videoId, volume, isPlaying, startProgressTracking]);
+  }, [isYouTubeAPIReady, videoId, volume, isPlaying, startProgressTracking, playbackMode, cleanupPreviousPlayer]);
+
+  // Create effect to update player when playbackMode changes
+  useEffect(() => {
+    if (videoId && isYouTubeAPIReady && youtubePlayerRef.current) {
+      cleanupPreviousPlayer();
+      
+      // Reinitialize player with new mode
+      const containerId = playbackMode === 'video' ? 'youtube-player-visible' : 'youtube-player-hidden';
+      const container = document.getElementById(containerId);
+      
+      if (container) {
+        // Create a new div for the YouTube player
+        const playerDiv = document.createElement('div');
+        playerDiv.id = 'youtube-player-container';
+        container.appendChild(playerDiv);
+        
+        // Initialize the player
+        console.log(`Recreating YouTube player for ${playbackMode} mode`);
+        
+        const newPlayer = new window.YT.Player('youtube-player-container', {
+          videoId: videoId,
+          width: '100%',
+          height: '100%',
+          playerVars: {
+            'playsinline': 1,
+            'controls': 0,
+            'autoplay': 1,
+            'disablekb': 1,
+            'modestbranding': 1,
+            'rel': 0,
+            'showinfo': 0,
+            'iv_load_policy': 3,
+            'fs': 0
+          },
+          events: {
+            'onReady': (event: any) => {
+              console.log("Player ready after mode change");
+              const player = event.target;
+              player.setVolume(volume * 100);
+              
+              if (isPlaying) {
+                player.playVideo();
+                player.seekTo(currentTimeRef.current, true);
+              } else {
+                player.pauseVideo();
+              }
+              
+              startProgressTracking(player);
+              setPlayerReady(true);
+            },
+            'onStateChange': (event: any) => {
+              const player = event.target;
+              
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                if (!isPlaying) setIsPlaying(true);
+                startProgressTracking(player);
+              } else if (event.data === window.YT.PlayerState.PAUSED) {
+                if (isPlaying) setIsPlaying(false);
+              }
+            },
+            'onError': (event: any) => {
+              console.error("Player error after mode change:", event);
+              setMediaError("Failed to play in this mode.");
+            }
+          }
+        });
+        
+        youtubePlayerRef.current = newPlayer;
+        setYoutubePlayerInstance(newPlayer);
+      }
+    }
+  }, [playbackMode, videoId, isYouTubeAPIReady, volume, isPlaying, startProgressTracking, cleanupPreviousPlayer, currentTimeRef]);
 
   // Handle mode transition
   const handleModeTransition = useCallback(() => {
@@ -318,9 +391,9 @@ export const Player = () => {
     handleModeTransition();
     setPlaybackMode(playbackMode === 'audio' ? 'video' : 'audio');
     
-    // Hide lyrics when switching to video
-    if (playbackMode === 'audio') {
-      setShowLyrics(false);
+    // Automatically show lyrics in audio mode
+    if (playbackMode === 'video') {
+      setShowLyrics(true);
     }
   }, [playbackMode, setPlaybackMode, handleModeTransition]);
 
@@ -426,7 +499,7 @@ export const Player = () => {
   `;
 
   return (
-    <div className={containerClasses}>
+    <div className={containerClasses} ref={playerContainerRef}>
       {/* Expanded player view */}
       {expandedPlayer ? (
         <div className="h-full flex flex-col">
@@ -451,37 +524,71 @@ export const Player = () => {
           
           {/* Main content area */}
           <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden">
-            {/* Video player or album art */}
-            <div className={`relative ${videoId ? 'w-full max-w-xl aspect-video' : 'w-full max-w-[70vw] sm:max-w-xs md:max-w-sm'} mb-4 sm:mb-6`}>
-              {videoId ? (
+            {/* Video player or album art with lyrics */}
+            <div className="relative w-full max-w-xl flex justify-center mb-4 sm:mb-6">
+              {/* Video container */}
+              {playbackMode === 'video' ? (
                 <div 
                   id="youtube-player-visible" 
-                  className={`w-full ${fullScreen ? 'fixed inset-0 z-50 bg-black' : 'aspect-video'} overflow-hidden rounded-lg shadow-lg`}
+                  ref={videoContainerRef}
+                  className={`w-full ${fullScreen ? 'fixed inset-0 z-50 bg-black' : 'aspect-video'} overflow-hidden rounded-lg shadow-lg relative`}
                 ></div>
               ) : (
-                <div 
-                  className="relative cursor-pointer group" 
-                  onClick={() => setExpandedPlayer(true)}
-                >
-                  <img 
-                    src={trackData.albumArt || trackData.thumbnailUrl} 
-                    alt={trackData.title} 
-                    className="w-full aspect-square object-cover rounded-lg shadow-lg"
-                    loading="lazy"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.onerror = null;
-                      target.src = 'https://via.placeholder.com/400/121212/FFFFFF?text=No+Image';
-                    }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg">
-                    <button className="p-2 sm:p-3 bg-white text-black rounded-full opacity-0 group-hover:opacity-100 transform scale-90 group-hover:scale-100 transition-all">
-                      <Video className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </button>
+                /* Audio mode with album art and lyrics */
+                <div className="w-full flex flex-col items-center">
+                  {/* Album art in audio mode */}
+                  <div className="relative w-full max-w-[70vw] sm:max-w-xs md:max-w-sm mb-4">
+                    <div className="relative cursor-pointer group">
+                      <img 
+                        src={trackData.albumArt || trackData.thumbnailUrl} 
+                        alt={trackData.title} 
+                        className="w-full aspect-square object-cover rounded-lg shadow-lg"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = 'https://via.placeholder.com/400/121212/FFFFFF?text=No+Image';
+                        }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg">
+                        <button 
+                          className="p-2 sm:p-3 bg-white text-black rounded-full opacity-0 group-hover:opacity-100 transform scale-90 group-hover:scale-100 transition-all"
+                          onClick={togglePlaybackMode}
+                        >
+                          <Video className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lyrics section - only shown in audio mode */}
+                  <div 
+                    className="w-full max-w-lg overflow-hidden rounded-lg bg-[#212121] p-4 max-h-[40vh] overflow-y-auto"
+                    ref={lyricsContainerRef}
+                  >
+                    <h3 className="text-white text-center text-lg font-semibold mb-4">Lyrics</h3>
+                    <div className="text-center space-y-6">
+                      {mockLyrics.map((lyric, index) => (
+                        <div 
+                          key={index}
+                          data-lyric-index={index}
+                          className={`transition-all duration-300 ${
+                            index === currentLyricIndex 
+                              ? 'text-white text-lg font-semibold transform scale-110' 
+                              : 'text-gray-400 text-base'
+                          }`}
+                        >
+                          {lyric.text}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
+            
+            {/* YouTube player for audio - hidden but still active */}
+            <div id="youtube-player-hidden" className="hidden"></div>
             
             {/* Playback controls for expanded view */}
             <div className="w-full max-w-md px-2 sm:px-0">
@@ -529,7 +636,6 @@ export const Player = () => {
                     className={`p-1 sm:p-2 ${playbackMode === 'audio' ? 'text-white' : 'text-gray-400'} hover:text-white`}
                     onClick={() => {
                       setPlaybackMode('audio');
-                      setExpandedPlayer(false);
                     }}
                   >
                     <Music className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -538,12 +644,11 @@ export const Player = () => {
                     className={`p-1 sm:p-2 ${playbackMode === 'video' ? 'text-white' : 'text-gray-400'} hover:text-white`}
                     onClick={() => {
                       setPlaybackMode('video');
-                      setExpandedPlayer(true);
                     }}
                   >
                     <Video className="w-3 h-3 sm:w-4 sm:h-4" />
                   </button>
-                  {videoId && (
+                  {videoId && playbackMode === 'video' && (
                     <button 
                       className="p-1 sm:p-2 text-gray-400 hover:text-white"
                       onClick={toggleFullScreen}
@@ -622,7 +727,6 @@ export const Player = () => {
                 className={`p-1 sm:p-1.5 ${playbackMode === 'audio' ? 'text-white bg-[#282828]' : 'text-gray-400'} hover:text-white hover:bg-[#333] rounded-full touch-manipulation`}
                 onClick={() => {
                   setPlaybackMode('audio');
-                  setExpandedPlayer(false);
                 }}
                 aria-label="Audio mode"
               >
@@ -650,14 +754,13 @@ export const Player = () => {
         </div>
       )}
       
-      {/* YouTube player for audio only - hidden */}
-      <div id="youtube-player-hidden" className="hidden"></div>
-      
-      {/* Hidden audio element for audio playback - removed since we use YouTube API */}
-      {playbackMode === 'audio' && !isYouTubeAPIReady && currentTrack?.url && (
-        <div className="hidden">
-          {/* Fallback message when YouTube API fails */}
-          {apiError && <p className="text-red-500 text-xs">{apiError}</p>}
+      {/* Display any errors */}
+      {(mediaError || apiError) && (
+        <div className="absolute bottom-16 left-0 right-0 flex justify-center">
+          <div className="bg-red-900/80 text-white px-4 py-2 rounded-md text-sm flex items-center">
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            <span>{mediaError || apiError}</span>
+          </div>
         </div>
       )}
     </div>
