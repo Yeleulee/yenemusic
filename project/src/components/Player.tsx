@@ -525,7 +525,7 @@ export const Player = () => {
           {/* Main content area */}
           <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden">
             {/* Video player or album art with lyrics */}
-            <div className="relative w-full max-w-xl flex justify-center mb-4 sm:mb-6">
+            <div className="relative w-full max-w-xl flex flex-col items-center justify-center mb-4 sm:mb-6">
               {/* Video container */}
               {playbackMode === 'video' ? (
                 <div 
@@ -537,12 +537,12 @@ export const Player = () => {
                 /* Audio mode with album art and lyrics */
                 <div className="w-full flex flex-col items-center">
                   {/* Album art in audio mode */}
-                  <div className="relative w-full max-w-[70vw] sm:max-w-xs md:max-w-sm mb-4">
-                    <div className="relative cursor-pointer group">
+                  <div className="relative w-full max-w-[60vw] sm:max-w-xs md:max-w-sm mb-6">
+                    <div className="relative cursor-pointer">
                       <img 
                         src={trackData.albumArt || trackData.thumbnailUrl} 
                         alt={trackData.title} 
-                        className="w-full aspect-square object-cover rounded-lg shadow-lg"
+                        className="w-full aspect-square object-cover rounded-lg shadow-lg ring-2 ring-[#333] ring-opacity-50"
                         loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -550,10 +550,11 @@ export const Player = () => {
                           target.src = 'https://via.placeholder.com/400/121212/FFFFFF?text=No+Image';
                         }}
                       />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg">
+                      <div className="absolute inset-0 flex items-center justify-center">
                         <button 
-                          className="p-2 sm:p-3 bg-white text-black rounded-full opacity-0 group-hover:opacity-100 transform scale-90 group-hover:scale-100 transition-all"
+                          className="p-2 sm:p-3 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-all"
                           onClick={togglePlaybackMode}
+                          aria-label="Switch to video mode"
                         >
                           <Video className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
@@ -561,27 +562,53 @@ export const Player = () => {
                     </div>
                   </div>
 
-                  {/* Lyrics section - only shown in audio mode */}
-                  <div 
-                    className="w-full max-w-lg overflow-hidden rounded-lg bg-[#212121] p-4 max-h-[40vh] overflow-y-auto"
-                    ref={lyricsContainerRef}
-                  >
-                    <h3 className="text-white text-center text-lg font-semibold mb-4">Lyrics</h3>
-                    <div className="text-center space-y-6">
-                      {mockLyrics.map((lyric, index) => (
-                        <div 
-                          key={index}
-                          data-lyric-index={index}
-                          className={`transition-all duration-300 ${
-                            index === currentLyricIndex 
-                              ? 'text-white text-lg font-semibold transform scale-110' 
-                              : 'text-gray-400 text-base'
-                          }`}
-                        >
-                          {lyric.text}
-                        </div>
-                      ))}
+                  {/* Lyrics section */}
+                  <div className="w-full max-w-lg rounded-lg mt-2 mb-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-white font-semibold text-sm sm:text-base">Lyrics</h3>
+                      <button 
+                        className="text-gray-400 hover:text-white text-xs sm:text-sm font-medium bg-[#282828] hover:bg-[#333] px-2 py-1 rounded-md"
+                        onClick={() => setShowLyrics(!showLyrics)}
+                      >
+                        {showLyrics ? "Hide" : "Show full lyrics"}
+                      </button>
                     </div>
+                    
+                    {showLyrics ? (
+                      <div 
+                        className="h-[30vh] sm:h-[35vh] overflow-y-auto pr-2 custom-scrollbar rounded-lg bg-[#181818] p-3 sm:p-4"
+                        ref={lyricsContainerRef}
+                      >
+                        <div className="text-center space-y-6 pb-6">
+                          {mockLyrics.map((lyric, index) => (
+                            <div 
+                              key={index}
+                              data-lyric-index={index}
+                              className={`transition-all duration-300 py-1 ${
+                                index === currentLyricIndex 
+                                  ? 'text-white text-base sm:text-lg font-semibold transform scale-110' 
+                                  : 'text-gray-400 text-sm sm:text-base'
+                              }`}
+                            >
+                              {lyric.text}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-[#181818] rounded-lg p-3 text-center">
+                        {currentLyricIndex >= 0 && mockLyrics[currentLyricIndex] && (
+                          <div className="text-white font-semibold text-base sm:text-lg mb-1">
+                            {mockLyrics[currentLyricIndex].text}
+                          </div>
+                        )}
+                        {currentLyricIndex + 1 < mockLyrics.length && (
+                          <div className="text-gray-400 text-sm">
+                            {mockLyrics[currentLyricIndex + 1]?.text}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -596,12 +623,16 @@ export const Player = () => {
               <div className="flex items-center space-x-2 mb-3 sm:mb-4">
                 <span className="text-[10px] sm:text-xs text-gray-400 w-8 sm:w-10 text-right">{formatTime(currentTime)}</span>
                 <div 
-                  className="progress-bar w-full h-1 bg-gray-700 cursor-pointer rounded-full"
+                  className="progress-bar w-full h-2 bg-gray-700 cursor-pointer rounded-full relative group"
                   onClick={handleProgressSeek}
                 >
                   <div 
                     className="progress h-full bg-green-500 rounded-full" 
                     style={{ width: `${progress}%` }}
+                  ></div>
+                  <div 
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 pointer-events-none"
+                    style={{ left: `${progress}%` }}
                   ></div>
                 </div>
                 <span className="text-[10px] sm:text-xs text-gray-400 w-8 sm:w-10">{formatTime(duration)}</span>
@@ -633,7 +664,7 @@ export const Player = () => {
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-1 sm:space-x-2">
                   <button 
-                    className={`p-1 sm:p-2 ${playbackMode === 'audio' ? 'text-white' : 'text-gray-400'} hover:text-white`}
+                    className={`p-1 sm:p-2 ${playbackMode === 'audio' ? 'text-white bg-[#282828] rounded-full' : 'text-gray-400'} hover:text-white`}
                     onClick={() => {
                       setPlaybackMode('audio');
                     }}
@@ -641,7 +672,7 @@ export const Player = () => {
                     <Music className="w-3 h-3 sm:w-4 sm:h-4" />
                   </button>
                   <button 
-                    className={`p-1 sm:p-2 ${playbackMode === 'video' ? 'text-white' : 'text-gray-400'} hover:text-white`}
+                    className={`p-1 sm:p-2 ${playbackMode === 'video' ? 'text-white bg-[#282828] rounded-full' : 'text-gray-400'} hover:text-white`}
                     onClick={() => {
                       setPlaybackMode('video');
                     }}
