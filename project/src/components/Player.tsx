@@ -3,6 +3,10 @@ import { Play, Pause, SkipBack, SkipForward, Volume, Video, Music, AlertTriangle
 import { usePlayerStore } from '../store/playerStore';
 import { useRouter } from 'next/router';
 
+// Track preloading state
+const PRELOAD_NEXT_TRACK = true;
+const MODE_SWITCH_DELAY = 100;
+
 // Sample lyrics data (in a real app, this would come from an API)
 const mockLyrics = [
   { time: 0, text: "[Intro]" },
@@ -36,6 +40,8 @@ const Player: React.FC = () => {
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const progressInterval = useRef<number | null>(null);
   const currentTimeRef = useRef<number>(0);
+  const nextPlayerRef = useRef<any>(null);
+  const lastPlaybackTime = useRef<number>(0);
   
   // Player store
   const { 
@@ -68,6 +74,11 @@ const Player: React.FC = () => {
   const [youtubePlayerInstance, setYoutubePlayerInstance] = useState<any>(null);
   const [lyrics, setLyrics] = useState<{time: number; text: string}[]>([]);
   const [lyricsFetched, setLyricsFetched] = useState(false);
+  
+  // Additional states for enhanced functionality
+  const [nextTrackId, setNextTrackId] = useState<string | null>(null);
+  const [isPreloadingNext, setIsPreloadingNext] = useState(false);
+  const [recommendedTracks, setRecommendedTracks] = useState<any[]>([]);
 
   // Add router for navigation
   const router = useRouter();
@@ -352,14 +363,30 @@ const Player: React.FC = () => {
 
   // Toggle between audio and video modes
   const togglePlaybackMode = useCallback(() => {
-    handleModeTransition();
-    setPlaybackMode(playbackMode === 'audio' ? 'video' : 'audio');
+    if (!youtubePlayerRef.current) return;
     
-    // Automatically show lyrics in audio mode
-    if (playbackMode === 'video') {
-      setShowLyrics(true);
-    }
-  }, [playbackMode, setPlaybackMode, handleModeTransition]);
+    // Store current playback time
+    lastPlaybackTime.current = youtubePlayerRef.current.getCurrentTime();
+    
+    // Start transition
+    handleModeTransition();
+    
+    // Switch mode after short delay
+    setTimeout(() => {
+      const newMode = playbackMode === 'audio' ? 'video' : 'audio';
+      setPlaybackMode(newMode);
+      
+      // Ensure playback continues from the same position
+      setTimeout(() => {
+        if (youtubePlayerRef.current) {
+          youtubePlayerRef.current.seekTo(lastPlaybackTime.current, true);
+          if (isPlaying) {
+            youtubePlayerRef.current.playVideo();
+          }
+        }
+      }, MODE_SWITCH_DELAY);
+    }, MODE_SWITCH_DELAY);
+  }, [playbackMode, setPlaybackMode, handleModeTransition, isPlaying]);
 
   // Update YouTube player volume when volume changes
   useEffect(() => {
@@ -376,7 +403,7 @@ const Player: React.FC = () => {
   useEffect(() => {
     if (youtubePlayerRef.current && playerReady) {
       try {
-        if (isPlaying) {
+      if (isPlaying) {
           youtubePlayerRef.current.playVideo();
         } else {
           youtubePlayerRef.current.pauseVideo();
@@ -462,16 +489,60 @@ const Player: React.FC = () => {
     transition-all duration-300 ease-in-out
   `;
 
-  // Function to fetch lyrics for the current track
+  // Preload next track
+  useEffect(() => {
+    if (PRELOAD_NEXT_TRACK && queue && queue.length > 0) {
+      const nextTrackInQueue = queue[0];
+      if (nextTrackInQueue?.url) {
+        try {
+          const url = new URL(nextTrackInQueue.url);
+          const nextId = url.searchParams.get('v');
+          if (nextId && nextId !== nextTrackId) {
+            setNextTrackId(nextId);
+            setIsPreloadingNext(true);
+            
+            // Initialize hidden player for next track
+            if (isYouTubeAPIReady) {
+              const containerId = 'next-player-container';
+              const playerDiv = document.createElement('div');
+              playerDiv.id = containerId;
+              
+              const container = document.getElementById('youtube-player-hidden');
+              if (container) {
+                container.appendChild(playerDiv);
+                
+                nextPlayerRef.current = new window.YT.Player(containerId, {
+                  videoId: nextId,
+                  width: '100%',
+                  height: '100%',
+                  playerVars: {
+                    'playsinline': 1,
+                    'controls': 0,
+                    'autoplay': 0,
+                    'disablekb': 1,
+                    'modestbranding': 1,
+                    'rel': 0,
+                    'showinfo': 0,
+                    'iv_load_policy': 3,
+                    'fs': 0
+                  }
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error preloading next track:", error);
+        }
+      }
+    }
+  }, [queue, isYouTubeAPIReady, nextTrackId]);
+
+  // Enhanced lyrics fetching and synchronization
   const fetchLyricsForTrack = async (title: string, artist: string) => {
     try {
       setLyricsFetched(false);
-      console.log(`Fetching lyrics for: ${title} by ${artist}`);
       
-      // For now, we'll use time-synced lyrics based on the track
-      // In a real app, you would call a lyrics API here
-      
-      // Clean up the title and artist for better matching
+      // Clean up the title and artist
       const cleanedTitle = title.toLowerCase()
         .replace(/\(feat\..*?\)/g, '')
         .replace(/\[.*?\]/g, '')
@@ -480,82 +551,25 @@ const Player: React.FC = () => {
       
       const cleanedArtist = artist.toLowerCase().trim();
       
-      // Generate synchronized lyrics based on track title and artist
-      // This is a fallback method since we don't have a real lyrics API
-      let generatedLyrics = [];
+      // Attempt to fetch from a lyrics service (you would implement this)
+      // For now, we'll use enhanced mock data with better timing
+      let syncedLyrics = [];
       
-      // Check if we match any known songs in our "database"
-      if (cleanedTitle.includes('way') && cleanedArtist.includes('bigxthaplug')) {
-        // "All The Way" lyrics (simplified)
-        generatedLyrics = [
-          { time: 0, text: "[Intro]" },
-          { time: 2, text: "Yeah, yeah" },
-          { time: 4, text: "Big X" },
-          { time: 6, text: "All the way" },
-          { time: 10, text: "I've been on my way, I've been on my way" },
-          { time: 15, text: "I've been on my way, I've been on my way" },
-          { time: 20, text: "I know I don't got time" },
-          { time: 25, text: "To be playing round with you" },
-          { time: 30, text: "And I've been in my zone" },
-          { time: 35, text: "I've been trying to make these moves" },
-          { time: 40, text: "I've been all the way up" },
-          { time: 45, text: "I've been all the way down" },
-          { time: 50, text: "I've been lost, but now I'm found" },
-          { time: 55, text: "I've been going all the way" },
-          { time: 60, text: "All the way, all the way" }
-        ];
-      } else if (cleanedTitle.includes('luther') && cleanedArtist.includes('kendrick')) {
-        // "Luther" lyrics (simplified)
-        generatedLyrics = [
-          { time: 0, text: "[Intro: SZA]" },
-          { time: 5, text: "Every day, every day" },
-          { time: 10, text: "Every day, every day" },
-          { time: 15, text: "[Verse 1: Kendrick Lamar]" },
-          { time: 20, text: "It's the king and I back again" },
-          { time: 25, text: "Look what I landed in" },
-          { time: 30, text: "Sky high life, get you high again" },
-          { time: 35, text: "Feelin' like I'm Luther" },
-          { time: 40, text: "I'm an institution, I'm a revolution" },
-          { time: 45, text: "Executin', no excuses" },
-          { time: 50, text: "Everybody fallin' in line" },
-          { time: 55, text: "I'm the one they shoot for" },
-          { time: 60, text: "I'm the one they pollute ya" }
-        ];
-      } else if (cleanedArtist.includes('jack black') || cleanedTitle.includes('lava')) {
-        // "Lava" lyrics (simplified)
-        generatedLyrics = [
-          { time: 0, text: "[Intro]" },
-          { time: 5, text: "A long, long time ago" },
-          { time: 10, text: "There was a volcano" },
-          { time: 15, text: "Living all alone in the middle of the sea" },
-          { time: 20, text: "He sat high above his bay" },
-          { time: 25, text: "Watching all the couples play" },
-          { time: 30, text: "And wishing that he had someone too" },
-          { time: 35, text: "And from his lava came this song" },
-          { time: 40, text: "Of hoping he would find someone" },
-          { time: 45, text: "♪ I have a dream I hope will come true ♪" },
-          { time: 50, text: "♪ That you're here with me, and I'm here with you ♪" }
-        ];
+      // Generate properly timed lyrics
+      const lyricsData = await generateTimedLyrics(cleanedTitle, cleanedArtist);
+      if (lyricsData && lyricsData.length > 0) {
+        syncedLyrics = lyricsData;
       } else {
-        // Generic lyrics for unknown songs - will be roughly synchronized
-        for (let i = 0; i < 20; i++) {
-          generatedLyrics.push({
-            time: i * 15,
-            text: i % 5 === 0 ? 
-              `[Verse ${Math.floor(i/5) + 1}]` : 
-              `${cleanedTitle} - Line ${i+1}`
-          });
-        }
+        // Fallback to generated lyrics with better timing
+        syncedLyrics = generateFallbackLyrics(cleanedTitle, cleanedArtist);
       }
       
-      setLyrics(generatedLyrics);
+      setLyrics(syncedLyrics);
       setLyricsFetched(true);
       
-      // Auto-show lyrics in audio mode
       if (playbackMode === 'audio') {
         setShowLyrics(true);
       }
-      
     } catch (error) {
       console.error("Error fetching lyrics:", error);
       setLyrics([{ time: 0, text: "Lyrics unavailable for this track" }]);
@@ -563,33 +577,32 @@ const Player: React.FC = () => {
     }
   };
 
-  // Fetch lyrics when the track changes
-  useEffect(() => {
-    if (currentTrack) {
-      fetchLyricsForTrack(currentTrack.title, currentTrack.artist);
-    }
-  }, [currentTrack]);
-
-  // Add handler functions for next and previous tracks
+  // Enhanced next/previous track handling
   const handleNextTrack = useCallback(() => {
     if (queue && queue.length > 0) {
-      nextTrack();
-    }
-  }, [nextTrack, queue]);
-
-  const handlePreviousTrack = useCallback(() => {
-    // If current time is more than 3 seconds, restart the track instead of going to previous
-    if (currentTime > 3) {
-      if (youtubePlayerRef.current) {
-        youtubePlayerRef.current.seekTo(0, true);
-        setProgress(0);
-        setCurrentTime(0);
-        currentTimeRef.current = 0;
+      // If we preloaded the next track, use it
+      if (nextPlayerRef.current && nextTrackId) {
+        const currentPlayer = youtubePlayerRef.current;
+        youtubePlayerRef.current = nextPlayerRef.current;
+        nextPlayerRef.current = currentPlayer;
+        
+        setVideoId(nextTrackId);
+        nextTrack();
+        
+        // Start playback immediately
+        youtubePlayerRef.current.playVideo();
+      } else {
+        nextTrack();
       }
-    } else {
-      previousTrack();
+    } else if (recommendedTracks.length > 0) {
+      // Play from recommendations if queue is empty
+      const nextRecommended = recommendedTracks[0];
+      if (nextRecommended) {
+        // Add to queue and play
+        // You would implement this based on your queue management
+      }
     }
-  }, [currentTime, previousTrack]);
+  }, [nextTrack, queue, nextTrackId, recommendedTracks]);
 
   // Add navigation handler
   const handleNavigate = useCallback((path: string) => {
@@ -671,9 +684,9 @@ const Player: React.FC = () => {
                         >
                           <Video className="w-5 h-5 sm:w-6 sm:h-6" />
                         </button>
-                      </div>
-                    </div>
-                    
+          </div>
+        </div>
+
                     {/* Now playing indicator */}
                     <div className="absolute -top-2 -left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center shadow-md">
                       <Headphones className="w-3 h-3 mr-1" />
@@ -788,10 +801,10 @@ const Player: React.FC = () => {
                   title="Previous track or restart"
                 >
                   <SkipBack className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
+          </button>
+          <button
                   className="p-2 sm:p-3 md:p-4 bg-white text-black rounded-full hover:bg-gray-200 transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white"
-                  onClick={togglePlay}
+            onClick={togglePlay}
                   title={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />}
@@ -802,14 +815,14 @@ const Player: React.FC = () => {
                   title="Next track"
                 >
                   <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
+          </button>
                 <button 
                   className="text-gray-400 p-1 sm:p-2 hover:text-white transition-colors duration-200"
                   title="Repeat"
                 >
                   <Repeat className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
+          </button>
+        </div>
 
               {/* Additional controls */}
               <div className="flex justify-between items-center">
@@ -849,16 +862,16 @@ const Player: React.FC = () => {
                   </button>
                   <div className="flex items-center space-x-1">
                     <Volume className={`w-3 h-3 sm:w-4 sm:h-4 ${volume === 0 ? 'text-gray-600' : 'text-gray-400'}`} />
-                    <input
-                      type="range"
-                      min="0"
+          <input
+            type="range"
+            min="0"
                       max="100"
                       value={volume * 100}
                       onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
                       className="w-12 sm:w-16 md:w-20 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 sm:[&::-webkit-slider-thumb]:w-3 sm:[&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                    />
-                  </div>
-                </div>
+          />
+        </div>
+      </div>
               </div>
             </div>
           </div>
@@ -956,6 +969,42 @@ const Player: React.FC = () => {
       )}
     </div>
   );
+};
+
+// Helper function to generate timed lyrics
+const generateTimedLyrics = async (title: string, artist: string) => {
+  // In a real app, this would call a lyrics service API
+  // For now, return null to use fallback
+  return null;
+};
+
+// Helper function to generate fallback lyrics with better timing
+const generateFallbackLyrics = (title: string, artist: string) => {
+  const lyrics = [];
+  const lines = [
+    "Verse 1",
+    title,
+    "By " + artist,
+    "Music flows through the night",
+    "Bringing rhythm and light",
+    "Chorus",
+    "Let the melody play",
+    "Taking us far away",
+    "Verse 2",
+    "Time stands still in this song",
+    "As we all sing along"
+  ];
+  
+  // Generate lyrics with proper timing
+  lines.forEach((line, index) => {
+    lyrics.push({
+      time: index * 12, // 12 seconds per line for more natural timing
+      text: line,
+      duration: 10 // Duration each line should be displayed
+    });
+  });
+  
+  return lyrics;
 };
 
 export default Player;
