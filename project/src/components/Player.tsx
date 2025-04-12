@@ -1185,13 +1185,13 @@ const Player: React.FC = () => {
       <div className={cn(
         "md:hidden fixed transition-all duration-300 ease-in-out",
         isMiniPlayer 
-          ? "w-[280px] rounded-2xl shadow-2xl bottom-20 right-4 z-50 overflow-hidden"
-          : "bottom-0 left-0 right-0 h-auto bg-background/95 backdrop-blur border-t border-border/40"
+          ? "w-[280px] rounded-xl shadow-2xl bottom-20 right-4 z-50 overflow-hidden bg-[#282828]"
+          : "bottom-0 left-0 right-0 h-auto bg-[#121212] border-t border-[#282828]"
       )}>
         {currentTrack && (
           <motion.div 
             className={cn(
-              "relative flex flex-col bg-background/95 backdrop-blur",
+              "relative flex flex-col",
               isMiniPlayer ? "p-3" : "p-4"
             )}
             drag={isMiniPlayer}
@@ -1222,11 +1222,13 @@ const Player: React.FC = () => {
             {/* Main Content */}
             <div className="flex items-center space-x-3">
               {/* Album Art */}
-              <div 
+              <motion.div 
                 className={cn(
-                  "relative rounded-xl overflow-hidden cursor-pointer group",
+                  "relative rounded-lg overflow-hidden cursor-pointer group",
                   isMiniPlayer ? "w-12 h-12" : "w-14 h-14"
                 )}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={!isDragging ? togglePlaybackMode : undefined}
               >
                 <img 
@@ -1234,73 +1236,83 @@ const Player: React.FC = () => {
                   alt={currentTrack.title}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                <motion.div 
+                  className="absolute inset-0 flex items-center justify-center bg-black/60"
+                  initial={{ opacity: 0 }}
+                  whileHover={{ opacity: 1 }}
+                >
                   {playbackMode === 'audio' ? (
                     <Video className="w-5 h-5 text-white" />
                   ) : (
                     <Music className="w-5 h-5 text-white" />
                   )}
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
               {/* Track Info */}
               <div className="flex-1 min-w-0">
-                <h3 className={cn(
-                  "font-semibold truncate",
-                  isMiniPlayer ? "text-sm" : "text-base"
-                )}>
+                <motion.h3 
+                  className={cn(
+                    "font-semibold truncate text-white",
+                    isMiniPlayer ? "text-sm" : "text-base"
+                  )}
+                  whileHover={{ scale: 1.02 }}
+                >
                   {currentTrack.title}
-                </h3>
-                <p className={cn(
-                  "text-muted-foreground truncate",
-                  isMiniPlayer ? "text-xs" : "text-sm"
-                )}>
+                </motion.h3>
+                <motion.p 
+                  className={cn(
+                    "text-[#b3b3b3] truncate hover:text-white",
+                    isMiniPlayer ? "text-xs" : "text-sm"
+                  )}
+                  whileHover={{ scale: 1.02 }}
+                >
                   {currentTrack.artist}
-                </p>
+                </motion.p>
               </div>
 
               {/* Controls */}
               <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size={isMiniPlayer ? "sm" : "default"}
-                  onClick={togglePlay}
+                <motion.button
                   className={cn(
-                    "hover:bg-accent/50",
+                    "text-white rounded-full p-2",
                     isMiniPlayer ? "h-8 w-8" : "h-10 w-10"
                   )}
+                  whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={togglePlay}
                 >
                   {isPlaying ? (
                     <Pause className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
                   ) : (
                     <Play className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
                   )}
-                </Button>
+                </motion.button>
                 {!isMiniPlayer && (
-                  <Button
-                    variant="ghost"
-                    size="default"
+                  <motion.button
+                    className="text-white rounded-full p-2 h-10 w-10"
+                    whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={handleNext}
-                    className="h-10 w-10 hover:bg-accent/50"
                   >
                     <SkipForward className="h-5 w-5" />
-                  </Button>
+                  </motion.button>
                 )}
-                <Button
-                  variant="ghost"
-                  size={isMiniPlayer ? "sm" : "default"}
-                  onClick={toggleMiniPlayer}
+                <motion.button
                   className={cn(
-                    "hover:bg-accent/50",
+                    "text-white rounded-full p-2",
                     isMiniPlayer ? "h-8 w-8" : "h-10 w-10"
                   )}
+                  whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleMiniPlayer}
                 >
                   {isMiniPlayer ? (
                     <Maximize className="h-4 w-4" />
                   ) : (
                     <Minimize className="h-5 w-5" />
                   )}
-                </Button>
+                </motion.button>
               </div>
             </div>
 
@@ -1308,22 +1320,29 @@ const Player: React.FC = () => {
             {!isMiniPlayer && (
               <div className="mt-3 space-y-2">
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-muted-foreground min-w-[40px]">
+                  <span className="text-xs text-[#b3b3b3] w-[40px] text-right select-none">
                     {formatTime(currentTime)}
                   </span>
-                  <div 
-                    className="relative flex-1 h-1 bg-accent/30 rounded-full cursor-pointer group"
-                    onClick={handleProgressSeek}
-                  >
+                  <div className="relative flex-1 group">
                     <div 
-                      className="absolute h-full bg-primary rounded-full"
-                      style={{ width: `${progress}%` }}
-                    />
-                    <div className="absolute h-3 w-3 bg-primary rounded-full -top-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                         style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}
-                    />
+                      className="absolute w-full h-1 rounded-full bg-[#4d4d4d] cursor-pointer"
+                      onClick={handleProgressSeek}
+                    >
+                      <motion.div 
+                        className="absolute h-full bg-[#1ed760] rounded-full"
+                        style={{ width: `${progress}%` }}
+                        initial={{ width: "0%" }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.1 }}
+                      />
+                      <motion.div 
+                        className="absolute h-3 w-3 bg-white rounded-full -top-1 opacity-0 group-hover:opacity-100"
+                        style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}
+                        transition={{ duration: 0.1 }}
+                      />
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground min-w-[40px]">
+                  <span className="text-xs text-[#b3b3b3] w-[40px] select-none">
                     {formatTime(duration)}
                   </span>
                 </div>
@@ -1331,40 +1350,49 @@ const Player: React.FC = () => {
                 {/* Additional Controls */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <motion.button
+                      className={cn(
+                        "text-[#b3b3b3] hover:text-white p-2 rounded-full",
+                        isShuffle && "text-[#1ed760]"
+                      )}
+                      whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={toggleShuffle}
-                      className={cn("hover:bg-accent/50", isShuffle && "text-primary")}
                     >
                       <Shuffle className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    </motion.button>
+                    <motion.button
+                      className={cn(
+                        "text-[#b3b3b3] hover:text-white p-2 rounded-full",
+                        isRepeat && "text-[#1ed760]"
+                      )}
+                      whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={toggleRepeat}
-                      className={cn("hover:bg-accent/50", isRepeat && "text-primary")}
                     >
                       <Repeat className="h-4 w-4" />
-                    </Button>
+                    </motion.button>
                   </div>
                   <div className="flex items-center space-x-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <motion.button
+                      className="text-[#b3b3b3] hover:text-white p-2 rounded-full"
+                      whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={toggleLyrics}
-                      className="hover:bg-accent/50"
                     >
                       <Mic className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    </motion.button>
+                    <motion.button
+                      className={cn(
+                        "text-[#b3b3b3] hover:text-white p-2 rounded-full",
+                        showQueue && "text-[#1ed760]"
+                      )}
+                      whileHover={{ scale: 1.1, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={toggleQueue}
-                      className={cn("hover:bg-accent/50", showQueue && "text-primary")}
                     >
                       <List className="h-4 w-4" />
-                    </Button>
+                    </motion.button>
                   </div>
                 </div>
               </div>
