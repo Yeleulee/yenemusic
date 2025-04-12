@@ -10,6 +10,34 @@ export interface YouTubeVideo {
   publishedAt?: string;
 }
 
+// List of popular/mainstream music artists to prioritize
+const popularArtists = [
+  'Drake', 'Taylor Swift', 'The Weeknd', 'Beyoncé', 'Kendrick Lamar', 'Eminem', 'Rihanna', 'Ariana Grande',
+  'Justin Bieber', 'Ed Sheeran', 'Bruno Mars', 'Post Malone', 'Travis Scott', 'Billie Eilish', 'Bad Bunny',
+  'Lady Gaga', 'Dua Lipa', 'Kanye West', 'Jay-Z', 'Nicki Minaj', 'BTS', 'Cardi B', 'Megan Thee Stallion',
+  'Lil Wayne', 'Coldplay', 'Adele', 'SZA', 'J. Cole', 'Imagine Dragons', 'Calvin Harris', 'Doja Cat',
+  'The Beatles', 'Michael Jackson', 'Elton John', 'Queen', 'Madonna', 'Mariah Carey', 'Whitney Houston',
+  'Frank Ocean', 'Tyler, The Creator', 'Olivia Rodrigo', 'Lil Nas X', 'Harry Styles', 'The Rolling Stones',
+  'Metallica', 'Nirvana', 'Led Zeppelin', 'Pink Floyd', 'U2', 'ABBA', 'AC/DC', 'Johnny Cash', 'Bob Dylan',
+  'David Bowie', 'Prince', 'Stevie Wonder', 'Alicia Keys', 'Usher', 'John Legend', 'Maroon 5', 'Katy Perry',
+  'Snoop Dogg', 'Dr. Dre', 'Tupac Shakur', 'The Notorious B.I.G.', 'Ice Cube', 'Red Hot Chili Peppers',
+  'Foo Fighters', 'Green Day', 'Linkin Park', 'Twenty One Pilots', 'Panic! At The Disco', 'Fall Out Boy'
+];
+
+// Function to check if an artist is popular or mainstream
+const isPopularArtist = (artist: string): boolean => {
+  if (!artist) return false;
+  
+  // Convert to lowercase for case-insensitive matching
+  const artistLower = artist.toLowerCase();
+  
+  // Check if the artist name is in our list of popular artists (case insensitive)
+  return popularArtists.some(popularArtist => 
+    artistLower.includes(popularArtist.toLowerCase()) || 
+    popularArtist.toLowerCase().includes(artistLower)
+  );
+};
+
 // Format duration from ISO 8601 format (PT1H2M3S) to human-readable (1:02:03)
 const formatDuration = (isoDuration: string): string => {
   if (!isoDuration) return "0:00";
@@ -122,6 +150,51 @@ const formatViewCount = (count: string): string => {
   }
 };
 
+// Filter videos to keep only those from popular artists or with high view counts
+const filterToPopularVideos = (videos: YouTubeVideo[]): YouTubeVideo[] => {
+  // First, sort by view count (highest first)
+  const sortedVideos = [...videos].sort((a, b) => {
+    const viewCountA = parseInt(a.viewCount?.replace(/[KMB]/g, '') || '0') || 0;
+    const viewCountB = parseInt(b.viewCount?.replace(/[KMB]/g, '') || '0') || 0;
+    return viewCountB - viewCountA;
+  });
+  
+  // Then filter out non-popular content
+  return sortedVideos.filter(video => {
+    // Keep videos from popular artists
+    if (isPopularArtist(video.artist)) {
+      return true;
+    }
+    
+    // Keep videos with high view counts (likely popular content)
+    const viewCount = parseInt(video.viewCount?.replace(/[KMB]/g, '') || '0') || 0;
+    if (viewCount >= 1000000) { // 1M+ views
+      return true;
+    }
+    
+    // Filter out obvious non-music content
+    const lowerTitle = video.title.toLowerCase();
+    const lowerArtist = video.artist.toLowerCase();
+    
+    // Filter out gameplay, vlogs, tutorials, etc.
+    if (
+      lowerTitle.includes('minecraft') || 
+      lowerTitle.includes('gameplay') || 
+      lowerTitle.includes('tutorial') || 
+      lowerTitle.includes('walkthrough') ||
+      lowerTitle.includes('how to') ||
+      lowerTitle.includes('reaction') ||
+      lowerArtist.includes('tutorial') ||
+      lowerArtist.includes('gaming')
+    ) {
+      return false;
+    }
+    
+    // Default to include
+    return true;
+  });
+};
+
 // Direct YouTube API Implementation (no Supabase Edge Function required)
 export const searchMusic = async (query: string): Promise<YouTubeVideo[]> => {
   try {
@@ -132,8 +205,11 @@ export const searchMusic = async (query: string): Promise<YouTubeVideo[]> => {
       throw new Error("YouTube API key is not configured");
     }
     
+    // Add "official music" to search query to prioritize official content
+    const enhancedQuery = `${query} official music`;
+    
     const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${apiKey}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=30&q=${encodeURIComponent(enhancedQuery)}&type=video&videoCategoryId=10&key=${apiKey}`
     );
 
     if (!response.ok) {
@@ -195,7 +271,11 @@ export const searchMusic = async (query: string): Promise<YouTubeVideo[]> => {
       };
     });
     
-    return videos;
+    // Filter to only popular content
+    const filteredVideos = filterToPopularVideos(videos);
+    
+    // Return only up to 20 filtered videos
+    return filteredVideos.slice(0, 20);
   } catch (error) {
     console.error('Search music error:', error);
     throw error;
@@ -212,7 +292,7 @@ export const getPopularMusic = async (): Promise<YouTubeVideo[]> => {
     }
     
     const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&chart=mostPopular&videoCategoryId=10&maxResults=20&key=${apiKey}`
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&chart=mostPopular&videoCategoryId=10&maxResults=30&key=${apiKey}`
     );
 
     if (!response.ok) {
@@ -249,7 +329,11 @@ export const getPopularMusic = async (): Promise<YouTubeVideo[]> => {
       };
     });
     
-    return videos;
+    // Filter to only popular artists and high-view content
+    const filteredVideos = filterToPopularVideos(videos);
+    
+    // Return filtered videos
+    return filteredVideos;
   } catch (error) {
     console.error('Get popular music error:', error);
     throw error;
@@ -261,7 +345,8 @@ export const getGenreMusic = async (genre: string, maxResults: number = 8): Prom
   try {
     console.log(`Fetching ${genre} music`);
     // Use the searchMusic function with genre-specific query
-    return await searchMusic(`${genre} music popular`);
+    // Add "official music" to prioritize real music content
+    return await searchMusic(`${genre} music official popular`);
   } catch (error) {
     console.error(`Get ${genre} music error:`, error);
     throw error;
