@@ -14,14 +14,50 @@ const playlists = [
   { id: 'sunset-song', name: 'Sunset Song', trackCount: 32, duration: '48 mins', color: 'from-orange-500 to-orange-700' }
 ];
 
-// Popular genres for music discovery
+// Update the genres with more visual information
 const genres = [
-  { id: 'pop', name: 'Pop', color: 'bg-[#7B2CBF]' },
-  { id: 'rock', name: 'Rock', color: 'bg-[#7B2CBF]' },
-  { id: 'hiphop', name: 'Hip Hop', color: 'bg-[#7B2CBF]' },
-  { id: 'rnb', name: 'R&B', color: 'bg-[#7B2CBF]' },
-  { id: 'electronic', name: 'Electronic', color: 'bg-[#7B2CBF]' },
-  { id: 'classical', name: 'Classical', color: 'bg-[#7B2CBF]' },
+  { 
+    id: 'pop', 
+    name: 'Pop', 
+    color: 'from-pink-500 to-purple-600',
+    coverUrl: 'https://i.scdn.co/image/ab67706f00000002ca5a7517156021292e5663a6',
+    artists: ['Taylor Swift', 'Ed Sheeran', 'Ariana Grande']
+  },
+  { 
+    id: 'hiphop', 
+    name: 'Hip Hop', 
+    color: 'from-blue-500 to-indigo-600',
+    coverUrl: 'https://i.scdn.co/image/ab67706f000000025f0ff9251e3cfe641160dc31',
+    artists: ['Drake', 'Kendrick Lamar', 'Travis Scott']
+  },
+  { 
+    id: 'rnb', 
+    name: 'R&B', 
+    color: 'from-purple-500 to-pink-600',
+    coverUrl: 'https://i.scdn.co/image/ab67706f00000002c9f71c6658d096e5172046f2',
+    artists: ['The Weeknd', 'SZA', 'Beyoncé']
+  },
+  { 
+    id: 'rock', 
+    name: 'Rock', 
+    color: 'from-red-500 to-orange-600',
+    coverUrl: 'https://i.scdn.co/image/ab67706f00000002fe6d8d1019d5b302213e3730',
+    artists: ['Imagine Dragons', 'Coldplay', 'Arctic Monkeys']
+  },
+  { 
+    id: 'electronic', 
+    name: 'Electronic', 
+    color: 'from-cyan-500 to-blue-600',
+    coverUrl: 'https://i.scdn.co/image/ab67706f000000026d1564c1309ea1187c3d0767',
+    artists: ['Calvin Harris', 'Daft Punk', 'Avicii']
+  },
+  { 
+    id: 'classical', 
+    name: 'Classical', 
+    color: 'from-amber-500 to-yellow-600',
+    coverUrl: 'https://i.scdn.co/image/ab67706f00000002d72ef75e14ca6f60ea2364c2',
+    artists: ['Mozart', 'Beethoven', 'Bach']
+  }
 ];
 
 // Fallback image to use when thumbnails fail to load
@@ -373,7 +409,32 @@ export const Home = () => {
   }
 
   return (
-    <div className="flex flex-col gap-8 py-4 px-4">
+    <div className="flex flex-col gap-12 py-6 px-6">
+      {/* Hero Section */}
+      <div className="relative h-[400px] rounded-2xl overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#2B1964] to-[#7B2CBF] opacity-90" />
+        <div className="absolute inset-0 bg-[url('https://i.scdn.co/image/ab67706f00000002ca5a7517156021292e5663a6')] bg-cover bg-center opacity-20" />
+        <div className="relative h-full flex flex-col justify-center px-8 sm:px-12 max-w-4xl">
+          <h1 className="text-5xl sm:text-6xl font-bold text-white mb-4 leading-tight">
+            Discover Your Next <br />Favorite Track
+          </h1>
+          <p className="text-xl text-gray-200 mb-8 max-w-2xl">
+            Explore millions of tracks across all genres. Stream high-quality music and create your perfect playlist.
+          </p>
+          <div className="flex gap-4">
+            <button 
+              className="bg-[#1ed760] text-black px-8 py-3 rounded-full font-semibold hover:scale-105 transition-all hover:bg-[#1fdf64] active:scale-95"
+              onClick={() => recentTracks.length > 0 && playTrack(recentTracks[0])}
+            >
+              Play Now
+            </button>
+            <button className="bg-white/10 backdrop-blur text-white px-8 py-3 rounded-full font-semibold hover:bg-white/20 transition-all">
+              Browse All
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Search Bar */}
       <div className="relative max-w-3xl mx-auto w-full">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -382,106 +443,121 @@ export const Home = () => {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search songs, artists, albums..."
-          className="w-full h-12 pl-12 pr-4 rounded-full bg-[#242424] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B2CBF] hover:bg-[#2a2a2a] transition-colors"
+          className="w-full h-14 pl-12 pr-4 rounded-full bg-[#242424] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1ed760] hover:bg-[#2a2a2a] transition-colors text-lg"
         />
         {isSearching && (
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[#7B2CBF]"></div>
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#1ed760] border-t-transparent"></div>
           </div>
         )}
       </div>
 
       {/* Search Results */}
-      {searchResults.length > 0 && (
+      {searchResults.length > 0 ? (
         <div className="w-full">
-          <h2 className="text-2xl font-bold text-white mb-4">Search Results</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <h2 className="text-2xl font-bold text-white mb-6">Search Results</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {searchResults.map((track) => (
-              <TrackCard
-                key={track.id}
-                track={track}
-                onClick={() => playTrack(track)}
-              />
+              <TrackCard key={track.id} track={track} onClick={() => playTrack(track)} />
             ))}
           </div>
         </div>
-      )}
-
-      {/* Show error if search fails */}
-      {error && (
-        <div className="w-full max-w-3xl mx-auto bg-red-900/20 border border-red-900/50 rounded-lg p-4 text-red-400 flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
-          <p>{error}</p>
-        </div>
-      )}
-
-      {/* Only show discover section and genres if not searching */}
-      {!searchResults.length && (
+      ) : (
         <>
-          {/* Discover Section */}
-          <div className="relative overflow-hidden rounded-xl bg-[#2B1964] text-white">
-            <div className="p-8 relative z-10">
-              <h1 className="text-4xl font-bold mb-2">Discover New Music</h1>
-              <p className="text-lg text-gray-300 mb-4">Listen to the latest tracks from your favorite artists.</p>
-              <button 
-                className="bg-white text-black px-6 py-2 rounded-full font-medium hover:scale-105 transition-transform active:scale-95"
-                onClick={() => {
-                  if (recentTracks.length > 0) {
-                    playTrack(recentTracks[0]);
-                  }
-                }}
+          {/* Genre Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {genres.map((genre) => (
+              <div
+                key={genre.id}
+                className="relative h-[280px] rounded-xl overflow-hidden group cursor-pointer"
+                onClick={() => handleGenreClick(genre.id)}
               >
-                Play Now
-              </button>
-            </div>
-            <div className="absolute -right-10 top-1/2 transform -translate-y-1/2 rotate-12 flex gap-4">
-              {recentTracks.slice(0, 4).map((track, index) => (
-                <div
-                  key={track.id}
-                  className="w-32 h-32 bg-[#3B2474] rounded-lg shadow-lg transform rotate-12 overflow-hidden"
-                >
+                {/* Background Image */}
+                <div className="absolute inset-0">
                   <img 
-                    src={track.thumbnailUrl} 
-                    alt={track.title}
-                    className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                    src={genre.coverUrl} 
+                    alt={genre.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
+                  <div className={`absolute inset-0 bg-gradient-to-br ${genre.color} opacity-80 group-hover:opacity-90 transition-opacity`} />
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Browse Genres */}
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-4">Browse Genres</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {genres.map((genre) => (
-                <button
-                  key={genre.id}
-                  onClick={() => handleGenreClick(genre.id)}
-                  className={`${genre.color} aspect-square rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-all active:scale-95 ${selectedGenre === genre.id ? 'ring-4 ring-white/50' : ''}`}
-                >
-                  <span className="text-white font-medium">{genre.name}</span>
-                </button>
-              ))}
-            </div>
+                {/* Content */}
+                <div className="relative h-full p-6 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-3xl font-bold text-white mb-2">{genre.name}</h3>
+                    <p className="text-white/80">Top Artists:</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {genre.artists.map((artist) => (
+                        <span key={artist} className="bg-black/30 text-white px-3 py-1 rounded-full text-sm">
+                          {artist}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <button className="bg-white/10 backdrop-blur w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-[#1ed760] transition-colors">
+                    <Play className="w-6 h-6 text-white group-hover:text-black" fill="currentColor" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Selected Genre Tracks */}
           {selectedGenre && genreMusic[selectedGenre] && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Top {genres.find(g => g.id === selectedGenre)?.name} Tracks</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">
+                  Top {genres.find(g => g.id === selectedGenre)?.name} Tracks
+                </h2>
+                <button 
+                  onClick={() => setSelectedGenre(null)}
+                  className="text-[#1ed760] hover:text-white transition-colors"
+                >
+                  View All
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 {genreMusic[selectedGenre].map((track) => (
-                  <TrackCard
-                    key={track.id}
-                    track={track}
-                    onClick={() => playTrack(track)}
-                  />
+                  <TrackCard key={track.id} track={track} onClick={() => playTrack(track)} />
                 ))}
               </div>
             </div>
           )}
+
+          {/* Featured Artists */}
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-6">Featured Artists</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6">
+              {verifiedArtists.slice(0, 8).map((artist, index) => (
+                <div
+                  key={artist}
+                  className="group cursor-pointer"
+                  onClick={() => setSearchQuery(artist)}
+                >
+                  <div className="relative aspect-square rounded-full overflow-hidden mb-3">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-blue-500 opacity-80 group-hover:opacity-90 transition-opacity" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Play className="w-8 h-8 text-white" fill="currentColor" />
+                    </div>
+                  </div>
+                  <p className="text-white text-sm font-medium text-center truncate group-hover:text-[#1ed760] transition-colors">
+                    {artist}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
         </>
+      )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="w-full max-w-3xl mx-auto bg-red-900/20 border border-red-900/50 rounded-lg p-4 text-red-400 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <p>{error}</p>
+        </div>
       )}
     </div>
   );
