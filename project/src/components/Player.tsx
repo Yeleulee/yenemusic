@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume, Video, Music, AlertTriangle, Maximize, Minimize, Headphones, Youtube, ChevronUp, ChevronDown, Heart, Share, List, Repeat, Shuffle, Loader, MessageSquare, X, Home, Search, Library, Settings } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume, Video, Music, AlertTriangle, Maximize, Minimize, Headphones, Youtube, ChevronUp, ChevronDown, Heart, Share, List, Repeat, Shuffle, Loader, MessageSquare, X, Home, Search, Library, Settings, Volume1, Volume2 } from 'lucide-react';
 import { usePlayerStore } from '../store/playerStore';
 import { useNavigate } from 'react-router-dom';
 import { getRecommendations } from '../lib/youtube';
@@ -104,6 +104,12 @@ const Player: React.FC = () => {
 
   // Replace router with navigate
   const navigate = useNavigate();
+
+  // Add new state variables after the existing ones
+  const [isMuted, setIsMuted] = useState(false);
+  const [isRepeat, setIsRepeat] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
   // Load YouTube API
   useEffect(() => {
@@ -450,12 +456,28 @@ const Player: React.FC = () => {
   }, [fullScreen]);
 
   const toggleExpandPlayer = useCallback(() => {
-    setExpandedPlayer(!expandedPlayer);
-    // If we're in video mode and minimizing, switch to audio mode
-    if (expandedPlayer && playbackMode === 'video') {
-      setPlaybackMode('audio');
+    if (expandedPlayer) {
+      // When minimizing
+      setExpandedPlayer(false);
+      // Keep playing but switch to audio mode if in video mode
+      if (playbackMode === 'video') {
+        setPlaybackMode('audio');
+        // Ensure the player continues from the same position
+        const currentTime = youtubePlayerRef.current?.getCurrentTime() || 0;
+        setTimeout(() => {
+          if (youtubePlayerRef.current) {
+            youtubePlayerRef.current.seekTo(currentTime, true);
+            if (isPlaying) {
+              youtubePlayerRef.current.playVideo();
+            }
+          }
+        }, 100);
+      }
+    } else {
+      // When expanding
+      setExpandedPlayer(true);
     }
-  }, [expandedPlayer, playbackMode]);
+  }, [expandedPlayer, playbackMode, isPlaying]);
 
   const toggleLyrics = useCallback(() => {
     setShowLyrics(!showLyrics);
@@ -634,11 +656,69 @@ const Player: React.FC = () => {
     }
   }, [currentTrack]);
 
-  // Update handleNext to use recommendations
+  // Add volume control functions
+  const handleVolumeChange = useCallback((value: number) => {
+    const newVolume = value / 100;
+    setVolume(newVolume);
+    if (youtubePlayerRef.current) {
+      youtubePlayerRef.current.setVolume(value);
+    }
+    if (newVolume > 0) {
+      setIsMuted(false);
+    }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    if (youtubePlayerRef.current) {
+      if (!isMuted) {
+        youtubePlayerRef.current.setVolume(0);
+        setIsMuted(true);
+      } else {
+        youtubePlayerRef.current.setVolume(volume * 100);
+        setIsMuted(false);
+      }
+    }
+  }, [isMuted, volume]);
+
+  // Add shuffle and repeat functions
+  const toggleShuffle = useCallback(() => {
+    setIsShuffle(!isShuffle);
+  }, [isShuffle]);
+
+  const toggleRepeat = useCallback(() => {
+    setIsRepeat(!isRepeat);
+  }, [isRepeat]);
+
+  // Update the handleNext function to include shuffle and repeat
   const handleNext = useCallback(() => {
     if (!youtubePlayerRef.current) return;
 
-    // If we have recommendations, use them first
+    if (isRepeat) {
+      // Replay current track
+      youtubePlayerRef.current.seekTo(0);
+      youtubePlayerRef.current.playVideo();
+      return;
+    }
+
+    if (isShuffle) {
+      // Combine recommendations and queue, then pick random
+      const allTracks = [...recommendations, ...queue];
+      if (allTracks.length > 0) {
+        const randomIndex = Math.floor(Math.random() * allTracks.length);
+        const nextTrack = allTracks[randomIndex];
+        setCurrentTrack(nextTrack);
+        
+        // Remove the track from its original array
+        if (randomIndex < recommendations.length) {
+          setRecommendations(recommendations.filter((_, i) => i !== randomIndex));
+        } else {
+          setQueue(queue.filter((_, i) => i !== (randomIndex - recommendations.length)));
+        }
+        return;
+      }
+    }
+
+    // Default behavior
     if (recommendations.length > 0) {
       const nextTrack = recommendations[0];
       setCurrentTrack(nextTrack);
@@ -646,7 +726,6 @@ const Player: React.FC = () => {
       return;
     }
 
-    // Otherwise use the queue
     if (queue.length > 0) {
       const nextTrack = queue[0];
       setCurrentTrack(nextTrack);
@@ -654,7 +733,7 @@ const Player: React.FC = () => {
       return;
     }
 
-    // If no recommendations or queue, get new recommendations
+    // Get new recommendations if needed
     if (currentTrack) {
       getRecommendations(currentTrack).then((newRecommendations) => {
         if (newRecommendations.length > 0) {
@@ -663,7 +742,7 @@ const Player: React.FC = () => {
         }
       });
     }
-  }, [currentTrack, queue, recommendations, youtubePlayerRef]);
+  }, [currentTrack, queue, recommendations, isRepeat, isShuffle, youtubePlayerRef]);
 
   return (
     <div className={cn(
@@ -709,6 +788,14 @@ const Player: React.FC = () => {
             <Button
               variant="ghost"
               size="icon"
+              onClick={toggleShuffle}
+              className={cn(isShuffle && "text-primary")}
+            >
+              <Shuffle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handlePreviousTrack}
               disabled={!currentTrack}
             >
@@ -717,6 +804,7 @@ const Player: React.FC = () => {
             <Button
               variant="ghost"
               size="icon"
+              className="h-10 w-10"
               onClick={togglePlay}
               disabled={!currentTrack}
             >
@@ -733,6 +821,14 @@ const Player: React.FC = () => {
               disabled={!currentTrack}
             >
               <SkipForward className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleRepeat}
+              className={cn(isRepeat && "text-primary")}
+            >
+              <Repeat className="h-4 w-4" />
             </Button>
           </div>
           <div className="w-full max-w-[600px] flex items-center space-x-2 px-4">
@@ -761,6 +857,43 @@ const Player: React.FC = () => {
           >
             <Mic className="h-5 w-5" />
           </Button>
+          {playbackMode === 'audio' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={togglePlaybackMode}
+              disabled={!currentTrack}
+            >
+              <Video className="h-5 w-5" />
+            </Button>
+          )}
+          <div className="relative" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMute}
+            >
+              {isMuted || volume === 0 ? (
+                <Volume className="h-5 w-5" />
+              ) : volume < 0.5 ? (
+                <Volume1 className="h-5 w-5" />
+              ) : (
+                <Volume2 className="h-5 w-5" />
+              )}
+            </Button>
+            {showVolumeSlider && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-background/95 rounded-lg shadow-lg">
+                <Slider
+                  orientation="vertical"
+                  value={[isMuted ? 0 : volume * 100]}
+                  max={100}
+                  step={1}
+                  className="h-24"
+                  onValueChange={(value) => handleVolumeChange(value[0])}
+                />
+              </div>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -833,15 +966,83 @@ const Player: React.FC = () => {
       {/* Video Player Container */}
       {playbackMode === 'video' && isExpanded && (
         <div className="fixed inset-0 bg-black z-50">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 z-50"
-            onClick={() => setExpandedPlayer(false)}
-          >
-            <ChevronDown className="h-6 w-6 text-white" />
-          </Button>
-          <div id="youtube-player-visible" className="w-full h-full" />
+          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/20"
+                  onClick={togglePlaybackMode}
+                >
+                  <Music className="h-5 w-5" />
+                </Button>
+                <div className="text-white">
+                  <div className="font-medium">{currentTrack?.title}</div>
+                  <div className="text-sm opacity-80">{currentTrack?.artist}</div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20"
+                onClick={toggleExpandPlayer}
+              >
+                <ChevronDown className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+          <div 
+            id="youtube-player-visible" 
+            className="w-full h-full"
+            onClick={togglePlay}
+          />
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+            <div className="flex flex-col space-y-2">
+              <Slider
+                value={[currentTime]}
+                max={duration}
+                step={1}
+                onValueChange={handleProgressSeek}
+                className="w-full"
+              />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white hover:bg-white/20"
+                    onClick={togglePlay}
+                  >
+                    {isPlaying ? (
+                      <Pause className="h-6 w-6" />
+                    ) : (
+                      <Play className="h-6 w-6" />
+                    )}
+                  </Button>
+                  <span className="text-white text-sm">
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white hover:bg-white/20"
+                    onClick={toggleMute}
+                  >
+                    {isMuted || volume === 0 ? (
+                      <Volume className="h-5 w-5" />
+                    ) : volume < 0.5 ? (
+                      <Volume1 className="h-5 w-5" />
+                    ) : (
+                      <Volume2 className="h-5 w-5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
