@@ -17,7 +17,7 @@ serve(async (req) => {
     const action = url.searchParams.get('action') || 'trending';
     const query = url.searchParams.get('q') || '';
     const limit = parseInt(url.searchParams.get('limit') || '10');
-    
+
     console.log(`YouTube API request: action=${action}, query=${query}, limit=${limit}`);
 
     let youtubeUrl = '';
@@ -35,7 +35,7 @@ serve(async (req) => {
         JSON.stringify({ error: 'YouTube API error', details: error }),
         { status: response.status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
-    }
+      }
 
     const data = await response.json();
     

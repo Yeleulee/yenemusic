@@ -177,7 +177,7 @@ export const Home = () => {
         } else {
           console.log(`Received ${videos.length} popular tracks:`, videos);
           setRecentTracks(videos);
-          setError(null);
+        setError(null);
         }
       } catch (err) {
         console.error('Error fetching popular music:', err);
@@ -245,8 +245,8 @@ export const Home = () => {
         setSearchResults([]);
       } else {
         console.log(`Received ${results.length} search results for query: "${query}"`, results);
-        setSearchResults(results);
-        setError(null);
+    setSearchResults(results);
+    setError(null);
       }
     } catch (err) {
       console.error('Error searching music:', err);

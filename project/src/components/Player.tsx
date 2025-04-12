@@ -384,7 +384,7 @@ export const Player = () => {
   useEffect(() => {
     if (youtubePlayerRef.current && playerReady) {
       try {
-        if (isPlaying) {
+      if (isPlaying) {
           youtubePlayerRef.current.playVideo();
         } else {
           youtubePlayerRef.current.pauseVideo();
@@ -1426,8 +1426,8 @@ export const Player = () => {
                   ></div>
                 </div>
                 <span className="text-[10px] sm:text-xs text-gray-400 w-8 sm:w-10">{formatTime(duration)}</span>
-              </div>
-              
+        </div>
+
               {/* Control buttons */}
               <div className="flex justify-center items-center space-x-2 sm:space-x-4 md:space-x-6 mb-3 sm:mb-4">
                 <button 
@@ -1442,10 +1442,10 @@ export const Player = () => {
                   title="Previous track or restart"
                 >
                   <SkipBack className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button 
+          </button>
+          <button
                   className="p-2 sm:p-3 md:p-4 bg-white text-black rounded-full hover:bg-gray-200 transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white"
-                  onClick={togglePlay}
+            onClick={togglePlay}
                   title={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />}
@@ -1456,15 +1456,15 @@ export const Player = () => {
                   title="Next track"
                 >
                   <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
+          </button>
                 <button 
                   className="text-gray-400 p-1 sm:p-2 hover:text-white transition-colors duration-200"
                   title="Repeat"
                 >
                   <Repeat className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
-              
+          </button>
+        </div>
+
               {/* Additional controls */}
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-1 sm:space-x-2">
@@ -1503,16 +1503,16 @@ export const Player = () => {
                   </button>
                   <div className="flex items-center space-x-1">
                     <Volume className={`w-3 h-3 sm:w-4 sm:h-4 ${volume === 0 ? 'text-gray-600' : 'text-gray-400'}`} />
-                    <input
-                      type="range"
-                      min="0"
+          <input
+            type="range"
+            min="0"
                       max="100"
                       value={volume * 100}
                       onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
                       className="w-12 sm:w-16 md:w-20 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 sm:[&::-webkit-slider-thumb]:w-3 sm:[&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                    />
-                  </div>
-                </div>
+          />
+        </div>
+      </div>
               </div>
             </div>
           </div>
