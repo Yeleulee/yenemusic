@@ -92,66 +92,98 @@ const formatPublishedDate = (date: string | undefined): string => {
 
 // TrackCard component for consistent rendering of tracks
 const TrackCard = ({ track, onClick }: { track: YouTubeVideo; onClick: () => void }) => {
-  // Check if this artist is verified
   const isVerified = isVerifiedArtist(track.artist);
-  
-  // Check if this is a trending track (1M+ views)
   const viewCount = parseInt(track.viewCount?.replace(/[KMB]/g, '') || '0') || 0;
   const isTrending = viewCount >= 1000000;
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
     <div 
-      className="bg-[#181818] rounded-md overflow-hidden transition-all duration-300 hover:bg-[#282828] cursor-pointer p-2 sm:p-3 md:p-4 h-full flex flex-col"
+      className="group bg-[#181818] rounded-lg overflow-hidden transition-all duration-300 hover:bg-[#282828] hover:transform hover:translate-y-[-4px] cursor-pointer"
       onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative w-full pb-[100%] mb-2 sm:mb-3 md:mb-4 overflow-hidden rounded-md">
+      {/* Thumbnail Container */}
+      <div className="relative aspect-square">
         <img 
           src={track.thumbnailUrl} 
           alt={track.title} 
-          className="absolute inset-0 w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform group-hover:scale-105"
           loading="lazy"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.onerror = null;
-            target.src = 'https://via.placeholder.com/300x300/121212/FFFFFF?text=No+Image';
+            target.src = FALLBACK_IMAGE;
           }}
         />
-        <div className="absolute bottom-1 sm:bottom-2 right-1 sm:right-2 bg-black bg-opacity-70 text-white text-xs px-1 rounded">
+        
+        {/* Duration Badge */}
+        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded-full">
           {track.duration}
         </div>
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black bg-opacity-50">
-          <button className="p-2 sm:p-3 bg-white text-black rounded-full transform hover:scale-110 transition-transform">
-            <Play className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
+
+        {/* Play Button Overlay */}
+        <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <button className="bg-[#1ed760] text-black p-3 rounded-full transform hover:scale-110 transition-all hover:bg-[#1fdf64] active:scale-95">
+            <Play className="w-6 h-6" fill="black" />
           </button>
         </div>
       </div>
-      <h3 className="text-white font-medium text-xs sm:text-sm md:text-base mb-1 line-clamp-2">{cleanTitle(track.title)}</h3>
-      <div className="flex items-center mb-1">
-        <p className="text-gray-400 text-xs sm:text-sm line-clamp-1 mr-1">{track.artist}</p>
-        {isVerified && (
-          <span className="bg-blue-500 rounded-full p-0.5 flex items-center justify-center">
-            <CheckCircle className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
-          </span>
-        )}
-      </div>
-      <div className="flex items-center space-x-1 sm:space-x-2 mt-auto">
-        <div className="flex items-center text-gray-400 text-xs">
-          <Eye className="w-3 h-3 mr-1" />
-          <span className="text-[10px] sm:text-xs">{formatViewCount(track.viewCount)}</span>
+
+      {/* Track Info */}
+      <div className="p-4">
+        <h3 className="text-white font-medium text-sm mb-1 line-clamp-2 group-hover:text-[#1ed760]">
+          {cleanTitle(track.title)}
+        </h3>
+        
+        <div className="flex items-center gap-2 mb-2">
+          <p className="text-[#b3b3b3] text-sm line-clamp-1 group-hover:text-white transition-colors">
+            {track.artist}
+          </p>
+          {isVerified && (
+            <span className="bg-[#1ed760] rounded-full p-1 flex items-center justify-center">
+              <CheckCircle className="w-3 h-3 text-black" />
+            </span>
+          )}
         </div>
-        <div className="text-gray-400 text-[10px] sm:text-xs">
-          {formatPublishedDate(track.publishedAt)}
-        </div>
-        {isTrending && (
-          <div className="flex items-center text-red-500 text-[10px] sm:text-xs ml-auto">
-            <Flame className="w-3 h-3 mr-0.5" />
-            <span>Trending</span>
+
+        {/* Track Stats */}
+        <div className="flex items-center justify-between text-xs text-[#b3b3b3]">
+          <div className="flex items-center gap-1">
+            <Eye className="w-3.5 h-3.5" />
+            <span>{formatViewCount(track.viewCount)}</span>
           </div>
-        )}
+          
+          <div className="flex items-center gap-2">
+            <span>{formatPublishedDate(track.publishedAt)}</span>
+            {isTrending && (
+              <div className="flex items-center gap-1 text-[#1ed760]">
+                <Flame className="w-3.5 h-3.5" />
+                <span>Trending</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 };
+
+// Add loading skeleton component
+const TrackCardSkeleton = () => (
+  <div className="bg-[#181818] rounded-lg overflow-hidden animate-pulse">
+    <div className="aspect-square bg-[#282828]" />
+    <div className="p-4">
+      <div className="h-4 bg-[#282828] rounded w-3/4 mb-2" />
+      <div className="h-4 bg-[#282828] rounded w-1/2 mb-4" />
+      <div className="flex justify-between">
+        <div className="h-3 bg-[#282828] rounded w-1/4" />
+        <div className="h-3 bg-[#282828] rounded w-1/4" />
+      </div>
+    </div>
+  </div>
+);
 
 export const Home = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -161,6 +193,21 @@ export const Home = () => {
   const [genreMusic, setGenreMusic] = useState<Record<string, YouTubeVideo[]>>({});
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { setCurrentTrack, setIsPlaying, setPlaybackMode } = usePlayerStore();
+
+  // Add search query state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounced search function
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery) {
+        handleSearch(searchQuery);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch popular music on load
   useEffect(() => {
@@ -271,64 +318,171 @@ export const Home = () => {
     setSelectedGenre(genreId);
   };
 
+  // Loading state with skeletons
   if (isLoading && !recentTracks.length && !Object.keys(genreMusic).length) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500"></div>
+      <div className="flex flex-col gap-8 py-4 px-4">
+        {/* Search Bar Skeleton */}
+        <div className="relative max-w-3xl mx-auto w-full">
+          <div className="w-full h-12 rounded-full bg-[#282828] animate-pulse" />
+        </div>
+
+        {/* Discover Section Skeleton */}
+        <div className="relative overflow-hidden rounded-xl bg-[#2B1964] animate-pulse">
+          <div className="p-8">
+            <div className="h-10 bg-[#3B2474] rounded w-1/2 mb-4" />
+            <div className="h-6 bg-[#3B2474] rounded w-3/4 mb-4" />
+            <div className="h-10 bg-[#3B2474] rounded w-32" />
+          </div>
+        </div>
+
+        {/* Genre Grid Skeleton */}
+        <div>
+          <div className="h-8 bg-[#282828] rounded w-48 mb-4 animate-pulse" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="aspect-square bg-[#282828] rounded-lg animate-pulse" />
+            ))}
+          </div>
+        </div>
+
+        {/* Track Grid Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {[...Array(10)].map((_, i) => (
+            <TrackCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && !searchResults.length && !recentTracks.length) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4">
+        <AlertCircle className="w-16 h-16 text-red-500" />
+        <h2 className="text-2xl font-bold text-white text-center">{error}</h2>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-[#1ed760] text-black px-6 py-2 rounded-full font-medium hover:bg-[#1fdf64] transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-8 py-4">
+    <div className="flex flex-col gap-8 py-4 px-4">
       {/* Search Bar */}
-      <div className="relative">
+      <div className="relative max-w-3xl mx-auto w-full">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
         <input
           type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search songs, artists, albums..."
-          className="w-full h-12 pl-12 pr-4 rounded-full bg-[#242424] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B2CBF]"
+          className="w-full h-12 pl-12 pr-4 rounded-full bg-[#242424] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B2CBF] hover:bg-[#2a2a2a] transition-colors"
         />
+        {isSearching && (
+          <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[#7B2CBF]"></div>
+          </div>
+        )}
       </div>
 
-      {/* Discover Section */}
-      <div className="relative overflow-hidden rounded-xl bg-[#2B1964] text-white">
-        <div className="p-8">
-          <h1 className="text-4xl font-bold mb-2">Discover New Music</h1>
-          <p className="text-lg text-gray-300 mb-4">Listen to the latest tracks from your favorite artists.</p>
-          <button 
-            className="bg-white text-black px-6 py-2 rounded-full font-medium hover:scale-105 transition-transform"
-            onClick={() => {
-              // Handle play now action
-            }}
-          >
-            Play Now
-          </button>
+      {/* Search Results */}
+      {searchResults.length > 0 && (
+        <div className="w-full">
+          <h2 className="text-2xl font-bold text-white mb-4">Search Results</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {searchResults.map((track) => (
+              <TrackCard
+                key={track.id}
+                track={track}
+                onClick={() => playTrack(track)}
+              />
+            ))}
+          </div>
         </div>
-        <div className="absolute -right-10 top-1/2 transform -translate-y-1/2 rotate-12 flex gap-4">
-          {[1, 2, 3, 4].map((_, index) => (
-            <div
-              key={index}
-              className="w-32 h-32 bg-[#3B2474] rounded-lg shadow-lg transform rotate-12"
-            />
-          ))}
-        </div>
-      </div>
+      )}
 
-      {/* Browse Genres */}
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-4">Browse Genres</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {genres.map((genre) => (
-            <div
-              key={genre.id}
-              className={`${genre.color} aspect-square rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform`}
-            >
-              <span className="text-white font-medium">{genre.name}</span>
+      {/* Show error if search fails */}
+      {error && (
+        <div className="w-full max-w-3xl mx-auto bg-red-900/20 border border-red-900/50 rounded-lg p-4 text-red-400 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Only show discover section and genres if not searching */}
+      {!searchResults.length && (
+        <>
+          {/* Discover Section */}
+          <div className="relative overflow-hidden rounded-xl bg-[#2B1964] text-white">
+            <div className="p-8 relative z-10">
+              <h1 className="text-4xl font-bold mb-2">Discover New Music</h1>
+              <p className="text-lg text-gray-300 mb-4">Listen to the latest tracks from your favorite artists.</p>
+              <button 
+                className="bg-white text-black px-6 py-2 rounded-full font-medium hover:scale-105 transition-transform active:scale-95"
+                onClick={() => {
+                  if (recentTracks.length > 0) {
+                    playTrack(recentTracks[0]);
+                  }
+                }}
+              >
+                Play Now
+              </button>
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="absolute -right-10 top-1/2 transform -translate-y-1/2 rotate-12 flex gap-4">
+              {recentTracks.slice(0, 4).map((track, index) => (
+                <div
+                  key={track.id}
+                  className="w-32 h-32 bg-[#3B2474] rounded-lg shadow-lg transform rotate-12 overflow-hidden"
+                >
+                  <img 
+                    src={track.thumbnailUrl} 
+                    alt={track.title}
+                    className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Browse Genres */}
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-4">Browse Genres</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {genres.map((genre) => (
+                <button
+                  key={genre.id}
+                  onClick={() => handleGenreClick(genre.id)}
+                  className={`${genre.color} aspect-square rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-all active:scale-95 ${selectedGenre === genre.id ? 'ring-4 ring-white/50' : ''}`}
+                >
+                  <span className="text-white font-medium">{genre.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selected Genre Tracks */}
+          {selectedGenre && genreMusic[selectedGenre] && (
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-4">Top {genres.find(g => g.id === selectedGenre)?.name} Tracks</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {genreMusic[selectedGenre].map((track) => (
+                  <TrackCard
+                    key={track.id}
+                    track={track}
+                    onClick={() => playTrack(track)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
