@@ -387,28 +387,20 @@ const Player: React.FC = () => {
   const togglePlaybackMode = useCallback(() => {
     if (!youtubePlayerRef.current) return;
     
-    // Store current playback time
-    lastPlaybackTime.current = youtubePlayerRef.current.getCurrentTime();
+    const newMode = playbackMode === 'audio' ? 'video' : 'audio';
+    setPlaybackMode(newMode);
     
-    // Start transition
-    handleModeTransition();
-    
-    // Switch mode after short delay
+    // Ensure playback continues from the same position
+    const currentTime = youtubePlayerRef.current.getCurrentTime();
     setTimeout(() => {
-      const newMode = playbackMode === 'audio' ? 'video' : 'audio';
-      setPlaybackMode(newMode);
-      
-      // Ensure playback continues from the same position
-      setTimeout(() => {
-        if (youtubePlayerRef.current) {
-          youtubePlayerRef.current.seekTo(lastPlaybackTime.current, true);
-          if (isPlaying) {
-            youtubePlayerRef.current.playVideo();
-          }
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.seekTo(currentTime, true);
+        if (isPlaying) {
+          youtubePlayerRef.current.playVideo();
         }
-      }, MODE_SWITCH_DELAY);
-    }, MODE_SWITCH_DELAY);
-  }, [playbackMode, setPlaybackMode, handleModeTransition, isPlaying]);
+      }
+    }, 100);
+  }, [playbackMode, setPlaybackMode, isPlaying]);
 
   // Update YouTube player volume when volume changes
   useEffect(() => {
@@ -628,17 +620,8 @@ const Player: React.FC = () => {
 
   // Update the navigation handler
   const handleNavigate = useCallback((path: string) => {
-    if (expandedPlayer) {
-      // Minimize player before navigation for better user experience
-      setExpandedPlayer(false);
-      // Small delay to allow animation to complete
-      setTimeout(() => {
-        navigate(path);
-      }, 100);
-    } else {
-      navigate(path);
-    }
-  }, [expandedPlayer, navigate]);
+    navigate(path);
+  }, [navigate]);
 
   // Add this useEffect to fetch recommendations when track changes
   useEffect(() => {
@@ -680,7 +663,7 @@ const Player: React.FC = () => {
 
   return (
     <div className={cn(
-      "fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      "fixed bottom-0 left-0 right-0 z-40 flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
       isExpanded ? "h-[calc(100vh-4rem)]" : "h-20"
     )}>
       {/* Desktop Layout */}
@@ -688,11 +671,23 @@ const Player: React.FC = () => {
         <div className="flex-1 flex items-center justify-start px-4 space-x-4">
           {currentTrack && (
             <>
-              <img 
-                src={currentTrack.thumbnailUrl} 
-                alt={currentTrack.title}
-                className="w-16 h-16 rounded-md object-cover"
-              />
+              <div 
+                className="relative cursor-pointer group"
+                onClick={togglePlaybackMode}
+              >
+                <img 
+                  src={currentTrack.thumbnailUrl} 
+                  alt={currentTrack.title}
+                  className="w-16 h-16 rounded-md object-cover"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
+                  {playbackMode === 'audio' ? (
+                    <Video className="w-6 h-6 text-white" />
+                  ) : (
+                    <Music className="w-6 h-6 text-white" />
+                  )}
+                </div>
+              </div>
               <div className="flex flex-col">
                 <span className="font-semibold text-sm truncate max-w-[200px]">
                   {currentTrack.title}
@@ -778,30 +773,79 @@ const Player: React.FC = () => {
 
       {/* Mobile Layout */}
       <div className="md:hidden flex items-center justify-between w-full h-20 px-4">
-        {/* ... existing mobile layout ... */}
+        {currentTrack && (
+          <>
+            <div className="flex items-center space-x-3">
+              <div 
+                className="relative cursor-pointer group"
+                onClick={togglePlaybackMode}
+              >
+                <img 
+                  src={currentTrack.thumbnailUrl} 
+                  alt={currentTrack.title}
+                  className="w-12 h-12 rounded-md object-cover"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
+                  {playbackMode === 'audio' ? (
+                    <Video className="w-4 h-4 text-white" />
+                  ) : (
+                    <Music className="w-4 h-4 text-white" />
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-medium text-sm truncate max-w-[150px]">
+                  {currentTrack.title}
+                </span>
+                <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                  {currentTrack.artist}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={togglePlay}
+              >
+                {isPlaying ? (
+                  <Pause className="h-5 w-5" />
+                ) : (
+                  <Play className="h-5 w-5" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNext}
+              >
+                <SkipForward className="h-5 w-5" />
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Expanded View */}
-      {isExpanded && (
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* ... existing expanded view content ... */}
+      {/* Video Player Container */}
+      {playbackMode === 'video' && isExpanded && (
+        <div className="fixed inset-0 bg-black z-50">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 z-50"
+            onClick={() => {
+              setExpandedPlayer(false);
+              setPlaybackMode('audio');
+            }}
+          >
+            <X className="h-6 w-6 text-white" />
+          </Button>
+          <div id="youtube-player-visible" className="w-full h-full" />
         </div>
       )}
 
-      {/* YouTube Player */}
-      <div className={cn(
-        "fixed top-0 left-0",
-        isExpanded ? "opacity-100" : "opacity-0"
-      )}>
-        <YouTube
-          ref={youtubePlayerRef}
-          videoId={currentTrack?.videoId}
-          opts={youtubeOpts}
-          onReady={handlePlayerReady}
-          onStateChange={handlePlayerStateChange}
-          onError={handlePlayerError}
-        />
-      </div>
+      {/* Hidden Audio Player */}
+      <div id="youtube-player-hidden" className="hidden" />
     </div>
   );
 };
