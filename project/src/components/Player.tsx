@@ -211,6 +211,9 @@ const Player: React.FC = () => {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
 
+  // Add new state for mobile player position
+  const [mobilePlayerPosition, setMobilePlayerPosition] = useState({ x: 0, y: 0 });
+
   // Load YouTube API
   useEffect(() => {
     if (!window.YT) {
@@ -1129,98 +1132,192 @@ const Player: React.FC = () => {
 
       {/* Mobile Layout */}
       <div className={cn(
-        "md:hidden w-full transition-all duration-300",
-        isMiniPlayer ? "fixed bottom-20 right-4 w-64 rounded-lg shadow-lg" : "h-20"
+        "md:hidden fixed transition-all duration-300 ease-in-out",
+        isMiniPlayer 
+          ? "w-[280px] rounded-2xl shadow-2xl bottom-20 right-4 z-50 overflow-hidden"
+          : "bottom-0 left-0 right-0 h-auto bg-background/95 backdrop-blur border-t border-border/40"
       )}>
         {currentTrack && (
           <motion.div 
             className={cn(
-              "flex items-center bg-background/95 backdrop-blur",
-              isMiniPlayer ? "p-2 rounded-lg" : "px-4 h-20"
+              "relative flex flex-col bg-background/95 backdrop-blur",
+              isMiniPlayer ? "p-3" : "p-4"
             )}
-            drag={isMiniPlayer ? "y" : false}
-            dragConstraints={{ top: 0, bottom: window.innerHeight - 100 }}
-            dragElastic={0.2}
+            drag={isMiniPlayer}
+            dragConstraints={{
+              top: 0,
+              left: 0,
+              right: window.innerWidth - 280,
+              bottom: window.innerHeight - 100
+            }}
+            dragMomentum={false}
+            dragElastic={0.1}
             onDragStart={() => setIsDragging(true)}
-            onDragEnd={() => setIsDragging(false)}
+            onDragEnd={(_, info) => {
+              setIsDragging(false);
+              setMobilePlayerPosition({
+                x: mobilePlayerPosition.x + info.offset.x,
+                y: mobilePlayerPosition.y + info.offset.y
+              });
+            }}
+            animate={isMiniPlayer ? {
+              x: mobilePlayerPosition.x,
+              y: mobilePlayerPosition.y
+            } : {
+              x: 0,
+              y: 0
+            }}
           >
-            <div className="flex items-center space-x-3 flex-1">
+            {/* Main Content */}
+            <div className="flex items-center space-x-3">
+              {/* Album Art */}
               <div 
-                className="relative cursor-pointer group"
+                className={cn(
+                  "relative rounded-xl overflow-hidden cursor-pointer group",
+                  isMiniPlayer ? "w-12 h-12" : "w-14 h-14"
+                )}
                 onClick={!isDragging ? togglePlaybackMode : undefined}
               >
                 <img 
                   src={currentTrack.thumbnailUrl} 
                   alt={currentTrack.title}
-                  className={cn(
-                    "rounded-md object-cover",
-                    isMiniPlayer ? "w-10 h-10" : "w-12 h-12"
-                  )}
+                  className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
                   {playbackMode === 'audio' ? (
-                    <Video className={cn(
-                      "text-white",
-                      isMiniPlayer ? "w-3 h-3" : "w-4 h-4"
-                    )} />
+                    <Video className="w-5 h-5 text-white" />
                   ) : (
-                    <Music className={cn(
-                      "text-white",
-                      isMiniPlayer ? "w-3 h-3" : "w-4 h-4"
-                    )} />
+                    <Music className="w-5 h-5 text-white" />
                   )}
                 </div>
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className={cn(
-                  "font-medium truncate",
-                  isMiniPlayer ? "text-xs max-w-[120px]" : "text-sm max-w-[150px]"
+
+              {/* Track Info */}
+              <div className="flex-1 min-w-0">
+                <h3 className={cn(
+                  "font-semibold truncate",
+                  isMiniPlayer ? "text-sm" : "text-base"
                 )}>
                   {currentTrack.title}
-                </span>
-                <span className={cn(
+                </h3>
+                <p className={cn(
                   "text-muted-foreground truncate",
-                  isMiniPlayer ? "text-[10px] max-w-[120px]" : "text-xs max-w-[150px]"
+                  isMiniPlayer ? "text-xs" : "text-sm"
                 )}>
                   {currentTrack.artist}
-                </span>
+                </p>
               </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size={isMiniPlayer ? "sm" : "icon"}
-                onClick={togglePlay}
-                className={isMiniPlayer ? "h-8 w-8" : ""}
-              >
-                {isPlaying ? (
-                  <Pause className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
-                ) : (
-                  <Play className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
-                )}
-              </Button>
-              {!isMiniPlayer && (
+
+              {/* Controls */}
+              <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
-                  size="icon"
-                  onClick={handleNext}
+                  size={isMiniPlayer ? "sm" : "default"}
+                  onClick={togglePlay}
+                  className={cn(
+                    "hover:bg-accent/50",
+                    isMiniPlayer ? "h-8 w-8" : "h-10 w-10"
+                  )}
                 >
-                  <SkipForward className="h-5 w-5" />
+                  {isPlaying ? (
+                    <Pause className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
+                  ) : (
+                    <Play className={isMiniPlayer ? "h-4 w-4" : "h-5 w-5"} />
+                  )}
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size={isMiniPlayer ? "sm" : "icon"}
-                onClick={toggleMiniPlayer}
-                className={isMiniPlayer ? "h-8 w-8" : ""}
-              >
-                {isMiniPlayer ? (
-                  <Maximize className="h-4 w-4" />
-                ) : (
-                  <Minimize className="h-5 w-5" />
+                {!isMiniPlayer && (
+                  <Button
+                    variant="ghost"
+                    size="default"
+                    onClick={handleNext}
+                    className="h-10 w-10 hover:bg-accent/50"
+                  >
+                    <SkipForward className="h-5 w-5" />
+                  </Button>
                 )}
-              </Button>
+                <Button
+                  variant="ghost"
+                  size={isMiniPlayer ? "sm" : "default"}
+                  onClick={toggleMiniPlayer}
+                  className={cn(
+                    "hover:bg-accent/50",
+                    isMiniPlayer ? "h-8 w-8" : "h-10 w-10"
+                  )}
+                >
+                  {isMiniPlayer ? (
+                    <Maximize className="h-4 w-4" />
+                  ) : (
+                    <Minimize className="h-5 w-5" />
+                  )}
+                </Button>
+              </div>
             </div>
+
+            {/* Progress Bar - Only show in full mode */}
+            {!isMiniPlayer && (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-muted-foreground min-w-[40px]">
+                    {formatTime(currentTime)}
+                  </span>
+                  <div 
+                    className="relative flex-1 h-1 bg-accent/30 rounded-full cursor-pointer group"
+                    onClick={handleProgressSeek}
+                  >
+                    <div 
+                      className="absolute h-full bg-primary rounded-full"
+                      style={{ width: `${progress}%` }}
+                    />
+                    <div className="absolute h-3 w-3 bg-primary rounded-full -top-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                         style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground min-w-[40px]">
+                    {formatTime(duration)}
+                  </span>
+                </div>
+
+                {/* Additional Controls */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleShuffle}
+                      className={cn("hover:bg-accent/50", isShuffle && "text-primary")}
+                    >
+                      <Shuffle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleRepeat}
+                      className={cn("hover:bg-accent/50", isRepeat && "text-primary")}
+                    >
+                      <Repeat className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleLyrics}
+                      className="hover:bg-accent/50"
+                    >
+                      <Mic className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleQueue}
+                      className={cn("hover:bg-accent/50", showQueue && "text-primary")}
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </div>
