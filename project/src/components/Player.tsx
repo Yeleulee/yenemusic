@@ -131,6 +131,17 @@ const AnimatedBar = ({ index, isPlaying, volume }: { index: number; isPlaying: b
 // Add crossfade functionality
 const CROSSFADE_DURATION = 3000; // 3 seconds
 
+// Add animation variants
+const slideUpVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 30 } }
+};
+
+const fadeVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } }
+};
+
 const Player: React.FC = () => {
   // Refs
   const youtubePlayerRef = useRef<any>(null);
@@ -952,183 +963,223 @@ const Player: React.FC = () => {
 
   return (
     <div className={cn(
-      "fixed bottom-0 left-0 right-0 z-40 flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      "fixed bottom-0 left-0 right-0 z-50",
+      "bg-[#121212] border-t border-[#282828]",
       isExpanded ? "h-[calc(100vh-4rem)]" : "h-20"
     )}>
       {/* Desktop Layout */}
-      <div className="hidden md:flex w-full h-full">
-        <div className="flex-1 flex items-center justify-start px-4 space-x-4">
+      <motion.div 
+        className="hidden md:flex w-full h-20 items-center px-4"
+        initial="hidden"
+        animate="visible"
+        variants={slideUpVariants}
+      >
+        {/* Left Section - Track Info */}
+        <div className="flex-1 flex items-center space-x-4 min-w-[180px] max-w-[300px]">
           {currentTrack && (
-            <>
+            <motion.div 
+              className="flex items-center space-x-4"
+              variants={fadeVariants}
+            >
               <div 
-                className="relative cursor-pointer group"
+                className="relative w-14 h-14 rounded-lg overflow-hidden cursor-pointer group"
                 onClick={togglePlaybackMode}
               >
                 <img 
                   src={currentTrack.thumbnailUrl} 
                   alt={currentTrack.title}
-                  className="w-16 h-16 rounded-md object-cover"
+                  className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
+                <motion.div 
+                  className="absolute inset-0 flex items-center justify-center bg-black/60"
+                  initial={{ opacity: 0 }}
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
                   {playbackMode === 'audio' ? (
-                    <Video className="w-6 h-6 text-white" />
+                    <Video className="w-5 h-5 text-white" />
                   ) : (
-                    <Music className="w-6 h-6 text-white" />
+                    <Music className="w-5 h-5 text-white" />
                   )}
-                </div>
+                </motion.div>
               </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-sm truncate max-w-[200px]">
+              <div className="flex flex-col min-w-0">
+                <motion.span 
+                  className="text-sm font-semibold text-white truncate max-w-[180px] hover:underline cursor-pointer"
+                  whileHover={{ scale: 1.02 }}
+                >
                   {currentTrack.title}
-                </span>
-                <span className="text-xs text-muted-foreground">
+                </motion.span>
+                <motion.span 
+                  className="text-xs text-[#b3b3b3] truncate max-w-[180px] hover:text-white hover:underline cursor-pointer"
+                  whileHover={{ scale: 1.02 }}
+                >
                   {currentTrack.artist}
-                </span>
+                </motion.span>
               </div>
-            </>
+              <motion.button
+                className="text-[#b3b3b3] hover:text-white transition-colors"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Heart className="h-5 w-5" />
+              </motion.button>
+            </motion.div>
           )}
         </div>
 
-        <div className="flex-[2] flex flex-col items-center justify-center">
-          <div className="flex items-center space-x-6">
-            <Button
-              variant="ghost"
-              size="icon"
+        {/* Center Section - Player Controls */}
+        <div className="flex-[2] flex flex-col items-center justify-center max-w-[722px]">
+          <div className="flex items-center justify-center space-x-4 mb-2">
+            <motion.button
+              className={cn(
+                "text-[#b3b3b3] hover:text-white transition-colors",
+                isShuffle && "text-[#1ed760]"
+              )}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
               onClick={toggleShuffle}
-              className={cn(isShuffle && "text-primary")}
             >
-              <Shuffle className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
+              <Shuffle className="h-4.5 w-4.5" />
+            </motion.button>
+            <motion.button
+              className="text-[#b3b3b3] hover:text-white transition-colors"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
               onClick={handlePreviousTrack}
-              disabled={!currentTrack}
             >
               <SkipBack className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10"
+            </motion.button>
+            <motion.button
+              className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:scale-105 transition-transform"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
               onClick={togglePlay}
-              disabled={!currentTrack}
             >
               {isPlaying ? (
-                <Pause className="h-6 w-6" />
+                <Pause className="h-5 w-5 text-black" />
               ) : (
-                <Play className="h-6 w-6" />
+                <Play className="h-5 w-5 text-black ml-0.5" />
               )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
+            </motion.button>
+            <motion.button
+              className="text-[#b3b3b3] hover:text-white transition-colors"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
               onClick={handleNext}
-              disabled={!currentTrack}
             >
               <SkipForward className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
+            </motion.button>
+            <motion.button
+              className={cn(
+                "text-[#b3b3b3] hover:text-white transition-colors",
+                isRepeat && "text-[#1ed760]"
+              )}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
               onClick={toggleRepeat}
-              className={cn(isRepeat && "text-primary")}
             >
-              <Repeat className="h-4 w-4" />
-            </Button>
+              <Repeat className="h-4.5 w-4.5" />
+            </motion.button>
           </div>
-          <div className="w-full max-w-[600px] flex items-center space-x-2 px-4">
-            <span className="text-xs w-12 text-right">
+
+          {/* Progress Bar */}
+          <div className="w-full flex items-center space-x-2">
+            <span className="text-xs text-[#b3b3b3] w-[40px] text-right select-none">
               {formatTime(currentTime)}
             </span>
-            <Slider
-              value={[currentTime]}
-              max={duration}
-              step={1}
-              onValueChange={handleProgressSeek}
-              className="flex-1"
-            />
-            <span className="text-xs w-12">
+            <div className="relative flex-1 group">
+              <div 
+                className="absolute w-full h-1 rounded-full bg-[#4d4d4d] cursor-pointer"
+                onClick={handleProgressSeek}
+              >
+                <motion.div 
+                  className="absolute h-full bg-[#b3b3b3] rounded-full group-hover:bg-[#1ed760]"
+                  style={{ width: `${progress}%` }}
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+                <motion.div 
+                  className="absolute h-3 w-3 bg-white rounded-full -top-1 opacity-0 group-hover:opacity-100"
+                  style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+            </div>
+            <span className="text-xs text-[#b3b3b3] w-[40px] select-none">
               {formatTime(duration)}
             </span>
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-end px-4 space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
+        {/* Right Section - Additional Controls */}
+        <div className="flex-1 flex items-center justify-end space-x-4 min-w-[180px] max-w-[300px]">
+          <motion.button
+            className="text-[#b3b3b3] hover:text-white transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
             onClick={toggleLyrics}
-            disabled={!currentTrack}
           >
-            <Mic className="h-5 w-5" />
-          </Button>
-          {playbackMode === 'audio' && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={togglePlaybackMode}
-              disabled={!currentTrack}
-            >
-              <Video className="h-5 w-5" />
-            </Button>
-          )}
-          <div className="relative" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
-            <Button
-              variant="ghost"
-              size="icon"
+            <Mic className="h-4 w-4" />
+          </motion.button>
+          <motion.button
+            className="text-[#b3b3b3] hover:text-white transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={toggleQueue}
+          >
+            <List className="h-4 w-4" />
+          </motion.button>
+          <div 
+            className="relative" 
+            onMouseEnter={() => setShowVolumeSlider(true)} 
+            onMouseLeave={() => setShowVolumeSlider(false)}
+          >
+            <motion.button
+              className="text-[#b3b3b3] hover:text-white transition-colors"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
               onClick={toggleMute}
             >
               {isMuted || volume === 0 ? (
-                <Volume className="h-5 w-5" />
+                <Volume className="h-4 w-4" />
               ) : volume < 0.5 ? (
-                <Volume1 className="h-5 w-5" />
+                <Volume1 className="h-4 w-4" />
               ) : (
-                <Volume2 className="h-5 w-5" />
+                <Volume2 className="h-4 w-4" />
               )}
-            </Button>
-            {showVolumeSlider && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-background/95 rounded-lg shadow-lg">
-                <Slider
-                  orientation="vertical"
-                  value={[isMuted ? 0 : volume * 100]}
-                  max={100}
-                  step={1}
-                  className="h-24"
-                  onValueChange={(value) => handleVolumeChange(value[0])}
-                />
-              </div>
-            )}
+            </motion.button>
+            <AnimatePresence>
+              {showVolumeSlider && (
+                <motion.div 
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-[#282828] rounded-lg shadow-xl"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                >
+                  <div className="h-24 flex items-center justify-center">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={isMuted ? 0 : volume * 100}
+                      onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                      className="volume-slider"
+                      style={{
+                        WebkitAppearance: 'slider-vertical',
+                        writing-mode: 'bt-lr',
+                        width: '6px',
+                        height: '100%'
+                      }}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleExpandPlayer}
-          >
-            {isExpanded ? (
-              <ChevronDown className="h-5 w-5" />
-            ) : (
-              <ChevronUp className="h-5 w-5" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleQueue}
-            className={cn(showQueue && "text-primary")}
-          >
-            <List className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCrossfadeEnabled(!crossfadeEnabled)}
-            className={cn(crossfadeEnabled && "text-primary")}
-          >
-            <SwitchHorizontal className="h-5 w-5" />
-          </Button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Mobile Layout */}
       <div className={cn(
